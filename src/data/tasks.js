@@ -1,7 +1,7 @@
 
 import { ref, watch } from 'vue'
 
-const savedTasks = localStorage.getItem('taskflow-tasks')
+const STORAGE_KEY = 'taskflow-tasks'
 
 const defaultTasks = [
   {
@@ -21,31 +21,59 @@ const defaultTasks = [
     title: 'Перевірити роботу PWA',
     priority: 'Низький',
     done: true
+  },
+  {
+    id: 4,
+    title: 'Перевірити навігацію TaskFlow',
+    priority: 'Високий',
+    done: true
+  },
+  {
+    id: 5,
+    title: 'Оформити звіт із практичної',
+    priority: 'Середній',
+    done: false
+  },
+  {
+    id: 6,
+    title: 'Перевірити мобільну версію',
+    priority: 'Низький',
+    done: false
   }
 ]
 
-let initialTasks = defaultTasks
-
-if (savedTasks) {
+function loadTasks() {
   try {
-    initialTasks = JSON.parse(savedTasks)
+    const saved = localStorage.getItem(STORAGE_KEY)
+
+    if (saved !== null) {
+      const parsed = JSON.parse(saved)
+
+      if (Array.isArray(parsed)) {
+        return parsed
+      }
+    }
   } catch (error) {
-    initialTasks = defaultTasks
+    console.error('Помилка завантаження завдань:', error)
   }
+
+  return defaultTasks
 }
 
-export const tasks = ref(initialTasks)
+export const tasks = ref(loadTasks())
 
 watch(tasks, (newTasks) => {
-  localStorage.setItem('taskflow-tasks', JSON.stringify(newTasks))
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(newTasks))
 }, { deep: true })
 
 export function addTask(title) {
-  if (!title.trim()) return
+  const text = title.trim()
+
+  if (!text) return
 
   tasks.value.push({
-    id: Date.now(),
-    title: title.trim(),
+    id: crypto.randomUUID(),
+    title: text,
     priority: 'Середній',
     done: false
   })

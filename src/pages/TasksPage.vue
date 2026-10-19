@@ -8,9 +8,10 @@
     <f7-block>
       <p>Усього завдань: {{ tasks.length }}</p>
       <p>Виконано: {{ completedCount }}</p>
+      <p>Очікує виконання: {{ pendingCount }}</p>
     </f7-block>
 
-    <f7-list strong inset dividers>
+    <f7-list v-if="tasks.length > 0" strong inset dividers>
       <f7-list-item
         v-for="task in tasks"
         :key="task.id"
@@ -22,6 +23,10 @@
         @change="task.done = !task.done"
       />
     </f7-list>
+
+    <f7-block v-else strong inset>
+      <p>Завдань поки немає</p>
+    </f7-block>
 
     <f7-block-title>Нове завдання</f7-block-title>
 
@@ -49,9 +54,13 @@ import { tasks, addTask } from '../data/tasks.js'
 
 const newTask = ref('')
 
-const completedCount = computed(() => {
-  return tasks.value.filter(task => task.done).length
-})
+const completedCount = computed(() =>
+  tasks.value.filter(task => task.done).length
+)
+
+const pendingCount = computed(() =>
+  tasks.value.length - completedCount.value
+)
 
 function saveTask() {
   addTask(newTask.value)

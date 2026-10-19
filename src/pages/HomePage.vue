@@ -7,9 +7,31 @@
       </f7-nav-right>
     </f7-navbar>
 
+    <f7-block-title>Статистика завдань</f7-block-title>
+
+    <div class="stats-container">
+      <div class="stat-card">
+        <span class="stat-icon">📋</span>
+        <div class="stat-number">{{ totalTasks }}</div>
+        <div class="stat-label">Усього завдань</div>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-icon">✅</span>
+        <div class="stat-number">{{ completedTasks }}</div>
+        <div class="stat-label">Виконано</div>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-icon">⏳</span>
+        <div class="stat-number">{{ pendingTasks }}</div>
+        <div class="stat-label">Очікує виконання</div>
+      </div>
+    </div>
+
     <f7-block-title>Мої завдання</f7-block-title>
 
-    <f7-list strong inset dividers>
+    <f7-list v-if="tasks.length > 0" strong inset dividers>
       <f7-list-item
         v-for="task in tasks"
         :key="task.id"
@@ -21,6 +43,10 @@
         @change="task.done = !task.done"
       />
     </f7-list>
+
+    <f7-block v-else strong inset>
+      Завдань поки немає
+    </f7-block>
 
     <f7-block-title>Додати завдання</f7-block-title>
 
@@ -35,7 +61,7 @@
     </f7-list>
 
     <f7-block>
-      <f7-button fill @click="addTask">
+      <f7-button fill @click="saveTask">
         Додати завдання
       </f7-button>
     </f7-block>
@@ -43,79 +69,77 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed } from 'vue'
+import { tasks, addTask } from '../data/tasks.js'
 
-const STORAGE_KEY = 'taskflow-tasks'
-
-const defaultTasks = [
-  {
-    id: 1,
-    title: 'Виконати практичну роботу',
-    priority: 'Високий',
-    done: false,
-  },
-  {
-    id: 2,
-    title: 'Завантажити проєкт на GitHub',
-    priority: 'Середній',
-    done: false,
-  },
-  {
-    id: 3,
-    title: 'Перевірити роботу PWA',
-    priority: 'Низький',
-    done: true,
-  },
-]
-
-function loadTasks() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-
-    if (saved !== null) {
-      const parsed = JSON.parse(saved)
-
-      if (Array.isArray(parsed)) {
-        return parsed
-      }
-    }
-  } catch (error) {
-    console.error('Failed to load tasks:', error)
-  }
-
-  return defaultTasks
-}
-
-const tasks = ref(loadTasks())
 const newTask = ref('')
 
-watch(
-  tasks,
-  (updatedTasks) => {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(updatedTasks)
-      )
-    } catch (error) {
-      console.error('Failed to save tasks:', error)
-    }
-  },
-  { deep: true }
+const totalTasks = computed(() => tasks.value.length)
+
+const completedTasks = computed(() =>
+  tasks.value.filter(task => task.done).length
 )
 
-function addTask() {
-  const title = newTask.value.trim()
+const pendingTasks = computed(() =>
+  totalTasks.value - completedTasks.value
+)
 
-  if (!title) return
-
-  tasks.value.push({
-    id: crypto.randomUUID(),
-    title,
-    priority: 'Середній',
-    done: false,
-  })
-
+function saveTask() {
+  addTask(newTask.value)
   newTask.value = ''
 }
 </script>
+
+<style scoped>
+.stats-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 16px;
+}
+
+.stat-card {
+  background: #f0f2fa;
+  border-radius: 14px;
+  padding: 20px 12px;
+  text-align: center;
+  color: #4b628f;
+}
+
+.stat-icon {
+  display: block;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.stat-number {
+  font-size: 28px;
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+.stat-label {
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+@media (max-width: 600px) {
+  .stats-container {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 14px 12px;
+    border-radius: 12px;
+  }
+
+  .stat-number {
+    font-size: 24px;
+  }
+
+  .stat-label {
+    font-size: 13px;
+  }
+}
+</style>

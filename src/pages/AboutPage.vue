@@ -33,5 +33,13 @@
       <p><b>Технології:</b> Vue 3, Vite, Framework7</p>
       <p><b>Версія:</b> 1.0</p>
     </f7-block>
+
+    <f7-block-title>Допомога</f7-block-title>
+
+    <f7-block>
+      <f7-button fill href="/help/">
+        Правила використання TaskFlow
+      </f7-button>
+    </f7-block>
   </f7-page>
 </template>
