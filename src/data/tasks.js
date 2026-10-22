@@ -1,80 +1,53 @@
 
-import { ref, watch } from 'vue'
-
-const STORAGE_KEY = 'taskflow-tasks'
-
-const defaultTasks = [
+export const tasks = [
   {
     id: 1,
-    title: 'Виконати практичну роботу',
-    priority: 'Високий',
-    done: false
+    title: 'Створити макет картки завдання',
+    description: 'Розробити компонент TaskCard для TaskFlow.',
+    status: 'todo',
+    priority: 'high',
+    dueDate: '2026-10-23'
   },
   {
     id: 2,
-    title: 'Завантажити проєкт на GitHub',
-    priority: 'Середній',
-    done: false
+    title: 'Налаштувати навігацію',
+    description: 'Реалізувати Navbar, Toolbar та переходи.',
+    status: 'done',
+    priority: 'medium',
+    dueDate: '2026-10-24'
   },
   {
     id: 3,
-    title: 'Перевірити роботу PWA',
-    priority: 'Низький',
-    done: true
+    title: 'Створити індикатор статусу',
+    description: 'Розробити компонент StatusBadge.',
+    status: 'progress',
+    priority: 'high',
+    dueDate: '2026-10-25'
   },
   {
     id: 4,
-    title: 'Перевірити навігацію TaskFlow',
-    priority: 'Високий',
-    done: true
+    title: 'Реалізувати фільтрацію завдань',
+    description: 'Додати фільтри за статусом і пріоритетом.',
+    status: 'todo',
+    priority: 'medium',
+    dueDate: '2026-10-27'
   },
   {
     id: 5,
-    title: 'Оформити звіт із практичної',
-    priority: 'Середній',
-    done: false
+    title: 'Створити адаптивний інтерфейс',
+    description: 'Налаштувати вигляд на різних екранах.',
+    status: 'progress',
+    priority: 'low',
+    dueDate: '2026-10-29'
   },
   {
     id: 6,
-    title: 'Перевірити мобільну версію',
-    priority: 'Низький',
-    done: false
+    title: 'Підготувати структуру PWA',
+    description: 'Налаштувати початковий проєкт.',
+    status: 'done',
+    priority: 'low',
+    dueDate: '2026-10-30'
   }
 ]
 
-function loadTasks() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-
-    if (saved !== null) {
-      const parsed = JSON.parse(saved)
-
-      if (Array.isArray(parsed)) {
-        return parsed
-      }
-    }
-  } catch (error) {
-    console.error('Помилка завантаження завдань:', error)
-  }
-
-  return defaultTasks
-}
-
-export const tasks = ref(loadTasks())
-
-watch(tasks, (newTasks) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(newTasks))
-}, { deep: true })
-
-export function addTask(title) {
-  const text = title.trim()
-
-  if (!text) return
-
-  tasks.value.push({
-    id: crypto.randomUUID(),
-    title: text,
-    priority: 'Середній',
-    done: false
-  })
-}
+export default tasks
