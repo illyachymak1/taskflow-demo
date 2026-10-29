@@ -1,9 +1,11 @@
 
-import { reactive, computed, watch } from 'vue'
+import { reactive, computed } from 'vue'
 import defaultTasks from '../data/tasks.js'
 
-const STORAGE_KEY = 'taskflow-tasks-kp25'
+const allowedStatuses = ['todo', 'progress', 'done']
+const allowedPriorities = ['low', 'medium', 'high']
 
+// Чотири завдання з попередньої практичної роботи
 const extraTasks = [
   {
     id: 7,
@@ -39,45 +41,16 @@ const extraTasks = [
   }
 ]
 
-function loadTasks() {
-  let savedTasks = []
-
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-
-    if (saved) {
-      const parsed = JSON.parse(saved)
-
-      if (Array.isArray(parsed)) {
-        savedTasks = parsed
-      }
-    }
-  } catch (error) {
-    console.log('Не вдалося завантажити завдання')
-  }
-
-  const initialTasks = savedTasks.length
-    ? savedTasks
-    : defaultTasks.map(task => ({ ...task }))
-
-  extraTasks.forEach(extraTask => {
-    const exists = initialTasks.some(task => task.id === extraTask.id)
-
-    if (!exists) {
-      initialTasks.push({ ...extraTask })
-    }
-  })
-
-  return initialTasks
-}
-
+// Спільне реактивне сховище
 export const state = reactive({
-  tasks: loadTasks()
+  tasks: [
+    ...defaultTasks.map(task => ({ ...task })),
+    ...extraTasks.map(task => ({ ...task }))
+  ]
 })
 
-export const totalTasks = computed(() => {
-  return state.tasks.length
-})
+// Реактивна статистика
+export const totalTasks = computed(() => state.tasks.length)
 
 export const completedTasks = computed(() => {
   return state.tasks.filter(task => task.status === 'done').length
@@ -87,10 +60,120 @@ export const pendingTasks = computed(() => {
   return state.tasks.filter(task => task.status !== 'done').length
 })
 
-export function changeStatus(id, status) {
-  const allowedStatuses = ['todo', 'progress', 'done']
+// Перевірка правильності дати
+function validDate(value) {
+  if (
+    typeof value !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(value)
+  ) {
+    return false
+  }
 
-  if (!allowedStatuses.includes(status)) return
+  const date = new Date(value + 'T12:00:00')
+
+  if (Number.isNaN(date.getTime())) {
+    return false
+  }
+
+  const formatted =
+    date.getFullYear() + '-' +
+    String(date.getMonth() + 1).padStart(2, '0') + '-' +
+    String(date.getDate()).padStart(2, '0')
+
+  return formatted === value
+}
+
+// Перевірка та підготовка даних завдання
+function normalizeTaskData(data) {
+  if (!data || typeof data !== 'object') {
+    return null
+  }
+
+  const title =
+    typeof data.title === 'string'
+      ? data.title.trim()
+      : ''
+
+  const description =
+    typeof data.description === 'string'
+      ? data.description.trim()
+      : ''
+
+  if (title.length < 3 || title.length > 80) {
+    return null
+  }
+
+  if (description.length > 300) {
+    return null
+  }
+
+  if (!allowedStatuses.includes(data.status)) {
+    return null
+  }
+
+  if (!allowedPriorities.includes(data.priority)) {
+    return null
+  }
+
+  if (!validDate(data.dueDate)) {
+    return null
+  }
+
+  return {
+    title,
+    description,
+    status: data.status,
+    priority: data.priority,
+    dueDate: data.dueDate
+  }
+}
+
+// Створення нового завдання
+export function addTask(data) {
+  const normalized = normalizeTaskData(data)
+
+  if (!normalized) {
+    return null
+  }
+
+  const nextId = state.tasks.reduce((maxId, task) => {
+    return Math.max(maxId, Number(task.id) || 0)
+  }, 0) + 1
+
+  const newTask = {
+    id: nextId,
+    ...normalized
+  }
+
+  state.tasks.push(newTask)
+
+  return newTask
+}
+
+// Редагування наявного завдання
+export function updateTask({ id, ...data }) {
+  const normalized = normalizeTaskData(data)
+
+  if (!normalized) {
+    return null
+  }
+
+  const task = state.tasks.find(task => task.id === id)
+
+  if (!task) {
+    return null
+  }
+
+  Object.assign(task, normalized)
+
+  return task
+}
+
+// Зміна статусу (залишаємо з попередньої роботи)
+export function changeStatus(id, status) {
+  if (!allowedStatuses.includes(status)) {
+    return
+  }
 
   const task = state.tasks.find(task => task.id === id)
 
@@ -99,10 +182,11 @@ export function changeStatus(id, status) {
   }
 }
 
+// Зміна пріоритету (залишаємо з попередньої роботи)
 export function changePriority(id, priority) {
-  const allowedPriorities = ['low', 'medium', 'high']
-
-  if (!allowedPriorities.includes(priority)) return
+  if (!allowedPriorities.includes(priority)) {
+    return
+  }
 
   const task = state.tasks.find(task => task.id === id)
 
@@ -110,26 +194,3 @@ export function changePriority(id, priority) {
     task.priority = priority
   }
 }
-
-export function addTask(title) {
-  const text = title.trim()
-
-  if (!text) return
-
-  state.tasks.push({
-    id: crypto.randomUUID(),
-    title: text,
-    description: 'Нове завдання',
-    status: 'todo',
-    priority: 'medium',
-    dueDate: ''
-  })
-}
-
-watch(
-  () => state.tasks,
-  (tasks) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
-  },
-  { deep: true }
-)

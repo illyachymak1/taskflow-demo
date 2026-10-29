@@ -10,9 +10,12 @@ import {
 } from 'framework7-vue'
 
 import TaskCard from '../components/TaskCard.vue'
+import TaskForm from '../components/TaskForm.vue'
 
 import {
   state,
+  addTask,
+  updateTask,
   changeStatus,
   changePriority
 } from '../store/tasks.js'
@@ -20,7 +23,12 @@ import {
 const statusFilter = ref('all')
 const priorityFilter = ref('all')
 const sortOrder = ref('default')
+const searchQuery = ref('')
+
 const selectedTaskId = ref(null)
+const formOpened = ref(false)
+const editingTaskId = ref(null)
+const formKey = ref(0)
 
 const priorityValues = {
   high: 3,
@@ -29,6 +37,8 @@ const priorityValues = {
 }
 
 const filteredTasks = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+
   const result = state.tasks.filter(task => {
     const matchesStatus =
       statusFilter.value === 'all' ||
@@ -38,27 +48,34 @@ const filteredTasks = computed(() => {
       priorityFilter.value === 'all' ||
       task.priority === priorityFilter.value
 
-    return matchesStatus && matchesPriority
+    const matchesSearch =
+      task.title.toLowerCase().includes(query)
+
+    return matchesStatus && matchesPriority && matchesSearch
   })
 
   if (sortOrder.value === 'high') {
-    result.sort((a, b) => {
-      return priorityValues[b.priority] - priorityValues[a.priority]
-    })
+    result.sort((a, b) =>
+      priorityValues[b.priority] - priorityValues[a.priority]
+    )
   }
 
   if (sortOrder.value === 'low') {
-    result.sort((a, b) => {
-      return priorityValues[a.priority] - priorityValues[b.priority]
-    })
+    result.sort((a, b) =>
+      priorityValues[a.priority] - priorityValues[b.priority]
+    )
   }
 
   return result
 })
 
-const selectedTask = computed(() => {
-  return state.tasks.find(task => task.id === selectedTaskId.value)
-})
+const selectedTask = computed(() =>
+  state.tasks.find(task => task.id === selectedTaskId.value) ?? null
+)
+
+const editingTask = computed(() =>
+  state.tasks.find(task => task.id === editingTaskId.value) ?? null
+)
 
 function handleStatusChange(data) {
   changeStatus(data.id, data.status)
@@ -76,10 +93,47 @@ function closeTaskDetails() {
   selectedTaskId.value = null
 }
 
+function openCreateForm() {
+  editingTaskId.value = null
+  formKey.value++
+  formOpened.value = true
+}
+
+function openEditForm(id) {
+  editingTaskId.value = id
+  formKey.value++
+  formOpened.value = true
+}
+
+function closeForm() {
+  formOpened.value = false
+}
+
 function resetFilters() {
   statusFilter.value = 'all'
   priorityFilter.value = 'all'
   sortOrder.value = 'default'
+  searchQuery.value = ''
+}
+
+// Створення та редагування завдань
+function handleSave(data) {
+  const isEditing = editingTaskId.value !== null
+
+  const result = isEditing
+    ? updateTask(data)
+    : addTask(data)
+
+  if (result) {
+    // Після створення нового завдання скидаємо фільтри
+    if (!isEditing) {
+      resetFilters()
+    }
+
+    closeForm()
+  } else {
+    alert('Не вдалося зберегти завдання.')
+  }
 }
 
 function statusName(status) {
@@ -116,27 +170,36 @@ function formatDate(value) {
     <f7-navbar title="Усі завдання" back-link="Назад" />
 
     <div class="tasks-container">
-
       <div class="page-heading">
         <h1>Мої завдання</h1>
-        <p>
-          Переглядайте завдання, змінюйте їхній статус
-          і пріоритет.
-        </p>
+        <p>Переглядайте, створюйте та редагуйте завдання.</p>
+
+        <button
+          type="button"
+          class="main-button"
+          @click="openCreateForm"
+        >
+          + Додати завдання
+        </button>
       </div>
 
       <div class="filters-section">
-        <h2>Фільтрація та сортування</h2>
+        <h2>Пошук, фільтрація та сортування</h2>
 
         <div class="filters-grid">
+          <div class="filter-group">
+            <label for="task-search">Пошук за назвою</label>
+            <input
+              id="task-search"
+              v-model="searchQuery"
+              type="search"
+              placeholder="Введіть назву завдання"
+            />
+          </div>
 
           <div class="filter-group">
             <label for="status-filter">Статус</label>
-
-            <select
-              id="status-filter"
-              v-model="statusFilter"
-            >
+            <select id="status-filter" v-model="statusFilter">
               <option value="all">Усі статуси</option>
               <option value="todo">Заплановано</option>
               <option value="progress">У роботі</option>
@@ -146,11 +209,7 @@ function formatDate(value) {
 
           <div class="filter-group">
             <label for="priority-filter">Пріоритет</label>
-
-            <select
-              id="priority-filter"
-              v-model="priorityFilter"
-            >
+            <select id="priority-filter" v-model="priorityFilter">
               <option value="all">Усі пріоритети</option>
               <option value="high">Високий</option>
               <option value="medium">Середній</option>
@@ -160,27 +219,20 @@ function formatDate(value) {
 
           <div class="filter-group">
             <label for="sort-order">Сортування</label>
-
-            <select
-              id="sort-order"
-              v-model="sortOrder"
-            >
+            <select id="sort-order" v-model="sortOrder">
               <option value="default">За порядком додавання</option>
               <option value="high">Від високого пріоритету</option>
               <option value="low">Від низького пріоритету</option>
             </select>
           </div>
-
         </div>
 
         <div class="filter-bottom">
-          <span>
-            Знайдено завдань: {{ filteredTasks.length }}
-          </span>
+          <span>Знайдено завдань: {{ filteredTasks.length }}</span>
 
           <button
             type="button"
-            class="reset-button"
+            class="main-button"
             @click="resetFilters"
           >
             Скинути фільтри
@@ -189,34 +241,68 @@ function formatDate(value) {
       </div>
 
       <div v-if="filteredTasks.length" class="tasks-grid">
-        <TaskCard
+        <div
           v-for="task in filteredTasks"
           :key="task.id"
-          :task="task"
-          @status-change="handleStatusChange"
-          @priority-change="handlePriorityChange"
-          @task-select="handleTaskSelect"
-        />
+          class="task-wrapper"
+        >
+          <TaskCard
+            :task="task"
+            @status-change="handleStatusChange"
+            @priority-change="handlePriorityChange"
+            @task-select="handleTaskSelect"
+          />
+
+          <button
+            type="button"
+            class="edit-button"
+            @click="openEditForm(task.id)"
+          >
+            Редагувати
+          </button>
+        </div>
       </div>
 
       <div v-else class="empty-state">
         <h3>Завдань не знайдено</h3>
-
-        <p>
-          Спробуйте вибрати інший статус або пріоритет.
-        </p>
-
+        <p>Спробуйте змінити параметри пошуку.</p>
         <button
           type="button"
-          class="reset-button"
+          class="main-button"
           @click="resetFilters"
         >
           Показати всі завдання
         </button>
       </div>
-
     </div>
 
+    <!-- Форма створення та редагування -->
+    <f7Popup
+      :opened="formOpened"
+      @popup:closed="closeForm"
+    >
+      <f7Page>
+        <f7Navbar
+          :title="editingTaskId !== null ? 'Редагування' : 'Нове завдання'"
+        >
+          <f7NavRight>
+            <f7Link popup-close>Закрити</f7Link>
+          </f7NavRight>
+        </f7Navbar>
+
+        <div class="popup-content">
+          <TaskForm
+            :key="formKey"
+            :task="editingTask"
+            :existing-tasks="state.tasks"
+            @save="handleSave"
+            @cancel="closeForm"
+          />
+        </div>
+      </f7Page>
+    </f7Popup>
+
+    <!-- Перегляд інформації про завдання -->
     <f7Popup
       :opened="selectedTaskId !== null"
       @popup:closed="closeTaskDetails"
@@ -230,7 +316,6 @@ function formatDate(value) {
 
         <div v-if="selectedTask" class="details-container">
           <h2>{{ selectedTask.title }}</h2>
-
           <p>{{ selectedTask.description }}</p>
 
           <div class="detail-row">
@@ -250,7 +335,6 @@ function formatDate(value) {
         </div>
       </f7Page>
     </f7Popup>
-
   </f7-page>
 </template>
 
@@ -271,8 +355,19 @@ function formatDate(value) {
   font-size: 14px;
 }
 
+.main-button,
+.edit-button {
+  border: none;
+  background: #7952b3;
+  color: white;
+  padding: 11px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
 .filters-section {
-  background: #ffffff;
+  background: white;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   padding: 18px;
@@ -286,7 +381,7 @@ function formatDate(value) {
 
 .filters-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -299,16 +394,17 @@ function formatDate(value) {
 .filter-group label {
   font-size: 13px;
   font-weight: 600;
-  color: #334155;
 }
 
+.filter-group input,
 .filter-group select {
+  box-sizing: border-box;
   width: 100%;
   min-width: 0;
   padding: 11px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  background: #ffffff;
+  background: white;
   color: #334155;
   font-size: 14px;
 }
@@ -320,22 +416,8 @@ function formatDate(value) {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 16px;
-  font-size: 13px;
   color: #64748b;
-}
-
-.reset-button {
-  border: none;
-  background: #7952b3;
-  color: #ffffff;
-  padding: 10px 15px;
-  border-radius: 8px;
-  cursor: pointer;
   font-size: 13px;
-}
-
-.reset-button:hover {
-  opacity: 0.85;
 }
 
 .tasks-grid {
@@ -344,22 +426,26 @@ function formatDate(value) {
   gap: 16px;
 }
 
+.task-wrapper {
+  min-width: 0;
+}
+
+.edit-button {
+  width: 100%;
+  margin-top: 8px;
+  background: #e9e1f4;
+  color: #604096;
+}
+
 .empty-state {
   padding: 35px 20px;
   text-align: center;
-  background: #ffffff;
+  background: white;
   border-radius: 14px;
 }
 
-.empty-state h3 {
-  font-size: 18px;
-  color: #334155;
-}
-
-.empty-state p {
-  font-size: 14px;
-  color: #64748b;
-  margin-bottom: 18px;
+.popup-content {
+  padding: 16px;
 }
 
 .details-container {
@@ -368,28 +454,15 @@ function formatDate(value) {
 
 .details-container h2 {
   color: #26354d;
-  margin-top: 0;
 }
 
 .details-container p {
   color: #596579;
-  line-height: 1.6;
 }
 
 .detail-row {
   padding: 14px 0;
   border-bottom: 1px solid #e2e8f0;
-  color: #334155;
-}
-
-.detail-row strong {
-  margin-right: 8px;
-}
-
-.reset-button:focus-visible,
-.filter-group select:focus-visible {
-  outline: 3px solid #7952b3;
-  outline-offset: 2px;
 }
 
 @media (max-width: 740px) {
