@@ -4,8 +4,9 @@ import defaultTasks from '../data/tasks.js'
 
 const allowedStatuses = ['todo', 'progress', 'done']
 const allowedPriorities = ['low', 'medium', 'high']
+const allowedCategories = ['study', 'work', 'personal']
 
-// Чотири завдання з попередньої практичної роботи
+// Додаткові завдання з попередньої роботи
 const extraTasks = [
   {
     id: 7,
@@ -49,18 +50,26 @@ export const state = reactive({
   ]
 })
 
+// Назва зі методички
+export const taskState = state
+
 // Реактивна статистика
 export const totalTasks = computed(() => state.tasks.length)
 
-export const completedTasks = computed(() => {
-  return state.tasks.filter(task => task.status === 'done').length
-})
+export const completedTasks = computed(() =>
+  state.tasks.filter(task => task.status === 'done').length
+)
 
-export const pendingTasks = computed(() => {
-  return state.tasks.filter(task => task.status !== 'done').length
-})
+export const pendingTasks = computed(() =>
+  state.tasks.filter(task => task.status !== 'done').length
+)
 
-// Перевірка правильності дати
+// Пошук завдання
+function findTask(id) {
+  return state.tasks.find(task => task.id === Number(id))
+}
+
+// Перевірка дати
 function validDate(value) {
   if (
     typeof value !== 'string' ||
@@ -69,7 +78,7 @@ function validDate(value) {
     return false
   }
 
-  const date = new Date(value + 'T12:00:00')
+  const date = new Date(`${value}T12:00:00`)
 
   if (Number.isNaN(date.getTime())) {
     return false
@@ -83,7 +92,7 @@ function validDate(value) {
   return formatted === value
 }
 
-// Перевірка та підготовка даних завдання
+// Перевірка введених даних
 function normalizeTaskData(data) {
   if (!data || typeof data !== 'object') {
     return null
@@ -119,16 +128,21 @@ function normalizeTaskData(data) {
     return null
   }
 
+  const category = allowedCategories.includes(data.category)
+    ? data.category
+    : 'study'
+
   return {
     title,
     description,
     status: data.status,
     priority: data.priority,
-    dueDate: data.dueDate
+    dueDate: data.dueDate,
+    category
   }
 }
 
-// Створення нового завдання
+// Створення завдання
 export function addTask(data) {
   const normalized = normalizeTaskData(data)
 
@@ -136,21 +150,21 @@ export function addTask(data) {
     return null
   }
 
-  const nextId = state.tasks.reduce((maxId, task) => {
-    return Math.max(maxId, Number(task.id) || 0)
-  }, 0) + 1
+  const nextId = state.tasks.reduce((maxId, task) =>
+    Math.max(maxId, Number(task.id) || 0), 0
+  ) + 1
 
   const newTask = {
     id: nextId,
     ...normalized
   }
 
-  state.tasks.push(newTask)
+  state.tasks.unshift(newTask)
 
   return newTask
 }
 
-// Редагування наявного завдання
+// Редагування завдання
 export function updateTask({ id, ...data }) {
   const normalized = normalizeTaskData(data)
 
@@ -158,7 +172,7 @@ export function updateTask({ id, ...data }) {
     return null
   }
 
-  const task = state.tasks.find(task => task.id === id)
+  const task = findTask(id)
 
   if (!task) {
     return null
@@ -169,28 +183,58 @@ export function updateTask({ id, ...data }) {
   return task
 }
 
-// Зміна статусу (залишаємо з попередньої роботи)
+// Зміна статусу
 export function changeStatus(id, status) {
   if (!allowedStatuses.includes(status)) {
-    return
+    return false
   }
 
-  const task = state.tasks.find(task => task.id === id)
+  const task = findTask(id)
 
-  if (task) {
-    task.status = status
+  if (!task) {
+    return false
   }
+
+  task.status = status
+  return true
 }
 
-// Зміна пріоритету (залишаємо з попередньої роботи)
+// Зміна пріоритету
 export function changePriority(id, priority) {
   if (!allowedPriorities.includes(priority)) {
-    return
+    return false
   }
 
-  const task = state.tasks.find(task => task.id === id)
+  const task = findTask(id)
 
-  if (task) {
-    task.priority = priority
+  if (!task) {
+    return false
   }
+
+  task.priority = priority
+  return true
+}
+
+// Сумісність із назвами функцій у методичці
+export function setTaskStatus({ id, status }) {
+  return changeStatus(id, status)
+}
+
+export function setTaskPriority({ id, priority }) {
+  return changePriority(id, priority)
+}
+
+// Видалення завдання
+export function deleteTask(id) {
+  const index = state.tasks.findIndex(
+    task => task.id === Number(id)
+  )
+
+  if (index === -1) {
+    return false
+  }
+
+  state.tasks.splice(index, 1)
+
+  return true
 }

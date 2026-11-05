@@ -11,11 +11,13 @@ import {
 
 import TaskCard from '../components/TaskCard.vue'
 import TaskForm from '../components/TaskForm.vue'
+import TaskListControls from '../components/TaskListControls.vue'
 
 import {
   state,
   addTask,
   updateTask,
+  deleteTask,
   changeStatus,
   changePriority
 } from '../store/tasks.js'
@@ -24,6 +26,7 @@ const statusFilter = ref('all')
 const priorityFilter = ref('all')
 const sortOrder = ref('default')
 const searchQuery = ref('')
+const onlyIncomplete = ref(false)
 
 const selectedTaskId = ref(null)
 const formOpened = ref(false)
@@ -37,7 +40,7 @@ const priorityValues = {
 }
 
 const filteredTasks = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase()
+  const query = searchQuery.value.trim().toLocaleLowerCase('uk-UA')
 
   const result = state.tasks.filter(task => {
     const matchesStatus =
@@ -48,22 +51,61 @@ const filteredTasks = computed(() => {
       priorityFilter.value === 'all' ||
       task.priority === priorityFilter.value
 
-    const matchesSearch =
-      task.title.toLowerCase().includes(query)
+    const matchesIncomplete =
+      !onlyIncomplete.value || task.status !== 'done'
 
-    return matchesStatus && matchesPriority && matchesSearch
+    const title = String(task.title ?? '').toLocaleLowerCase('uk-UA')
+    const description = String(task.description ?? '').toLocaleLowerCase('uk-UA')
+
+    const matchesSearch =
+      title.includes(query) ||
+      description.includes(query)
+
+    return (
+      matchesStatus &&
+      matchesPriority &&
+      matchesSearch &&
+      matchesIncomplete
+    )
   })
 
-  if (sortOrder.value === 'high') {
-    result.sort((a, b) =>
-      priorityValues[b.priority] - priorityValues[a.priority]
-    )
-  }
+  const compareTitle = (a, b) =>
+    String(a.title).localeCompare(String(b.title), 'uk-UA')
 
-  if (sortOrder.value === 'low') {
-    result.sort((a, b) =>
-      priorityValues[a.priority] - priorityValues[b.priority]
-    )
+  const comparePriority = (a, b) =>
+    (priorityValues[a.priority] ?? 0) -
+    (priorityValues[b.priority] ?? 0)
+
+  const compareDate = (a, b) =>
+    String(a.dueDate ?? '').localeCompare(String(b.dueDate ?? ''))
+
+  switch (sortOrder.value) {
+    case 'title-asc':
+      result.sort(compareTitle)
+      break
+
+    case 'title-desc':
+      result.sort((a, b) => compareTitle(b, a))
+      break
+
+    case 'priority-high':
+      result.sort((a, b) => comparePriority(b, a))
+      break
+
+    case 'priority-low':
+      result.sort(comparePriority)
+      break
+
+    case 'date-asc':
+      result.sort(compareDate)
+      break
+
+    case 'date-desc':
+      result.sort((a, b) => compareDate(b, a))
+      break
+
+    default:
+      break
   }
 
   return result
@@ -75,6 +117,16 @@ const selectedTask = computed(() =>
 
 const editingTask = computed(() =>
   state.tasks.find(task => task.id === editingTaskId.value) ?? null
+)
+
+const completedCount = computed(() =>
+  state.tasks.filter(task => task.status === 'done').length
+)
+
+const completionPercent = computed(() =>
+  state.tasks.length
+    ? Math.round(completedCount.value / state.tasks.length * 100)
+    : 0
 )
 
 function handleStatusChange(data) {
@@ -114,9 +166,9 @@ function resetFilters() {
   priorityFilter.value = 'all'
   sortOrder.value = 'default'
   searchQuery.value = ''
+  onlyIncomplete.value = false
 }
 
-// Створення та редагування завдань
 function handleSave(data) {
   const isEditing = editingTaskId.value !== null
 
@@ -125,14 +177,45 @@ function handleSave(data) {
     : addTask(data)
 
   if (result) {
-    // Після створення нового завдання скидаємо фільтри
     if (!isEditing) {
       resetFilters()
     }
 
     closeForm()
   } else {
-    alert('Не вдалося зберегти завдання.')
+    window.alert('Не вдалося зберегти завдання.')
+  }
+}
+
+function handleDelete(id) {
+  const task = state.tasks.find(item => item.id === id)
+
+  if (!task) {
+    return
+  }
+
+  const confirmed = window.confirm(
+    `Видалити завдання «${task.title}»?\n\nЦю дію не можна скасувати.`
+  )
+
+  if (!confirmed) {
+    return
+  }
+
+  const removed = deleteTask(id)
+
+  if (!removed) {
+    window.alert('Не вдалося видалити завдання.')
+    return
+  }
+
+  if (selectedTaskId.value === id) {
+    closeTaskDetails()
+  }
+
+  if (editingTaskId.value === id) {
+    closeForm()
+    editingTaskId.value = null
   }
 }
 
@@ -183,60 +266,38 @@ function formatDate(value) {
         </button>
       </div>
 
-      <div class="filters-section">
-        <h2>Пошук, фільтрація та сортування</h2>
+      <TaskListControls
+        v-model:search="searchQuery"
+        v-model:status="statusFilter"
+        v-model:priority="priorityFilter"
+        v-model:sort="sortOrder"
+        v-model:onlyIncomplete="onlyIncomplete"
+        :total="state.tasks.length"
+        :found="filteredTasks.length"
+        @reset="resetFilters"
+      />
 
-        <div class="filters-grid">
-          <div class="filter-group">
-            <label for="task-search">Пошук за назвою</label>
-            <input
-              id="task-search"
-              v-model="searchQuery"
-              type="search"
-              placeholder="Введіть назву завдання"
-            />
-          </div>
-
-          <div class="filter-group">
-            <label for="status-filter">Статус</label>
-            <select id="status-filter" v-model="statusFilter">
-              <option value="all">Усі статуси</option>
-              <option value="todo">Заплановано</option>
-              <option value="progress">У роботі</option>
-              <option value="done">Виконано</option>
-            </select>
-          </div>
-
-          <div class="filter-group">
-            <label for="priority-filter">Пріоритет</label>
-            <select id="priority-filter" v-model="priorityFilter">
-              <option value="all">Усі пріоритети</option>
-              <option value="high">Високий</option>
-              <option value="medium">Середній</option>
-              <option value="low">Низький</option>
-            </select>
-          </div>
-
-          <div class="filter-group">
-            <label for="sort-order">Сортування</label>
-            <select id="sort-order" v-model="sortOrder">
-              <option value="default">За порядком додавання</option>
-              <option value="high">Від високого пріоритету</option>
-              <option value="low">Від низького пріоритету</option>
-            </select>
-          </div>
+      <div class="progress-section">
+        <div class="progress-heading">
+          <strong>Прогрес виконання</strong>
+          <span>
+            {{ completedCount }} із {{ state.tasks.length }}
+            — {{ completionPercent }}%
+          </span>
         </div>
 
-        <div class="filter-bottom">
-          <span>Знайдено завдань: {{ filteredTasks.length }}</span>
-
-          <button
-            type="button"
-            class="main-button"
-            @click="resetFilters"
-          >
-            Скинути фільтри
-          </button>
+        <div
+          class="progress-track"
+          role="progressbar"
+          :aria-valuenow="completionPercent"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-label="Прогрес виконання завдань"
+        >
+          <div
+            class="progress-fill"
+            :style="{ width: `${completionPercent}%` }"
+          ></div>
         </div>
       </div>
 
@@ -253,25 +314,53 @@ function formatDate(value) {
             @task-select="handleTaskSelect"
           />
 
-          <button
-            type="button"
-            class="edit-button"
-            @click="openEditForm(task.id)"
-          >
-            Редагувати
-          </button>
+          <div class="task-actions">
+            <button
+              type="button"
+              class="edit-button"
+              @click="openEditForm(task.id)"
+            >
+              Редагувати
+            </button>
+
+            <button
+              type="button"
+              class="delete-button"
+              @click="handleDelete(task.id)"
+            >
+              Видалити
+            </button>
+          </div>
         </div>
       </div>
 
       <div v-else class="empty-state">
         <h3>Завдань не знайдено</h3>
-        <p>Спробуйте змінити параметри пошуку.</p>
+
+        <p v-if="state.tasks.length">
+          Спробуйте змінити параметри пошуку.
+        </p>
+
+        <p v-else>
+          Список порожній. Створіть перше завдання.
+        </p>
+
         <button
+          v-if="state.tasks.length"
           type="button"
           class="main-button"
           @click="resetFilters"
         >
           Показати всі завдання
+        </button>
+
+        <button
+          v-else
+          type="button"
+          class="main-button"
+          @click="openCreateForm"
+        >
+          + Додати завдання
         </button>
       </div>
     </div>
@@ -355,8 +444,8 @@ function formatDate(value) {
   font-size: 14px;
 }
 
-.main-button,
-.edit-button {
+.main-button {
+  width: 100%;
   border: none;
   background: #7952b3;
   color: white;
@@ -366,58 +455,36 @@ function formatDate(value) {
   font-size: 14px;
 }
 
-.filters-section {
+.progress-section {
   background: white;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   padding: 18px;
-  margin: 24px 0;
+  margin-bottom: 24px;
 }
 
-.filters-section h2 {
-  font-size: 18px;
-  margin: 0 0 16px;
-}
-
-.filters-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.filter-group {
+.progress-heading {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.filter-group label {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.filter-group input,
-.filter-group select {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  padding: 11px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: white;
-  color: #334155;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: #26354d;
   font-size: 14px;
 }
 
-.filter-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 16px;
-  color: #64748b;
-  font-size: 13px;
+.progress-track {
+  height: 10px;
+  background: #e2e8f0;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #7952b3;
+  border-radius: 20px;
+  transition: width 0.2s ease;
 }
 
 .tasks-grid {
@@ -430,11 +497,39 @@ function formatDate(value) {
   min-width: 0;
 }
 
-.edit-button {
-  width: 100%;
+.task-actions {
+  display: flex;
+  gap: 8px;
   margin-top: 8px;
+}
+
+.edit-button,
+.delete-button {
+  flex: 1;
+  padding: 11px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.edit-button {
+  border: none;
   background: #e9e1f4;
   color: #604096;
+}
+
+.delete-button {
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.edit-button:hover {
+  background: #ded0ef;
+}
+
+.delete-button:hover {
+  background: #ffe4e6;
 }
 
 .empty-state {
@@ -442,6 +537,10 @@ function formatDate(value) {
   text-align: center;
   background: white;
   border-radius: 14px;
+}
+
+.empty-state p {
+  color: #64748b;
 }
 
 .popup-content {
@@ -466,8 +565,7 @@ function formatDate(value) {
 }
 
 @media (max-width: 740px) {
-  .tasks-grid,
-  .filters-grid {
+  .tasks-grid {
     grid-template-columns: 1fr;
   }
 
