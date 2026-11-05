@@ -8,13 +8,23 @@ const props = defineProps({
   task: {
     type: Object,
     required: true
+  },
+  editable: {
+    type: Boolean,
+    default: false
+  },
+  deletable: {
+    type: Boolean,
+    default: false
   }
 })
 
 const emit = defineEmits([
   'status-change',
   'priority-change',
-  'task-select'
+  'task-select',
+  'edit',
+  'delete'
 ])
 
 const statusSequence = ['todo', 'progress', 'done']
@@ -77,11 +87,18 @@ function changePriority() {
 function selectTask() {
   emit('task-select', props.task.id)
 }
+
+function editTask() {
+  emit('edit', props.task.id)
+}
+
+function deleteTask() {
+  emit('delete', props.task.id)
+}
 </script>
 
 <template>
   <div class="task-card">
-
     <div class="card-header">
       <button
         type="button"
@@ -127,6 +144,28 @@ function selectTask() {
       </button>
     </div>
 
+    <div
+      v-if="editable || deletable"
+      class="management-actions"
+    >
+      <button
+        v-if="editable"
+        type="button"
+        class="management-button edit-button"
+        @click="editTask"
+      >
+        Редагувати
+      </button>
+
+      <button
+        v-if="deletable"
+        type="button"
+        class="management-button delete-button"
+        @click="deleteTask"
+      >
+        Видалити
+      </button>
+    </div>
   </div>
 </template>
 
@@ -218,12 +257,40 @@ function selectTask() {
   color: white;
 }
 
-.action-button:hover {
+.management-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.management-button {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.edit-button {
+  border: 1px solid #e7ddf3;
+  background: #ebe2f5;
+  color: #68439f;
+}
+
+.delete-button {
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #dc2626;
+}
+
+.action-button:hover,
+.management-button:hover {
   opacity: 0.85;
 }
 
 .task-title:focus-visible,
-.action-button:focus-visible {
+.action-button:focus-visible,
+.management-button:focus-visible {
   outline: 3px solid #7952b3;
   outline-offset: 3px;
 }
@@ -233,11 +300,13 @@ function selectTask() {
     flex-direction: column;
   }
 
-  .card-actions {
+  .card-actions,
+  .management-actions {
     flex-direction: column;
   }
 
-  .action-button {
+  .action-button,
+  .management-button {
     width: 100%;
   }
 }

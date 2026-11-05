@@ -30,6 +30,10 @@ const props = defineProps({
   found: {
     type: Number,
     default: 0
+  },
+  completed: {
+    type: Number,
+    default: 0
   }
 })
 
@@ -67,6 +71,14 @@ const onlyIncompleteValue = computed({
   set: value => emit('update:onlyIncomplete', value)
 })
 
+const completionPercent = computed(() => {
+  if (props.total === 0) {
+    return 0
+  }
+
+  return Math.round(props.completed / props.total * 100)
+})
+
 const hasFilters = computed(() =>
   props.search.trim() !== '' ||
   props.status !== 'all' ||
@@ -81,9 +93,15 @@ const hasFilters = computed(() =>
     <div class="controls-heading">
       <h2>Пошук, фільтрація та сортування</h2>
 
-      <span class="results-count">
-        Знайдено: {{ found }} із {{ total }}
-      </span>
+      <div class="results-info">
+        <span class="results-count">
+          Знайдено: {{ found }} із {{ total }}
+        </span>
+
+        <span class="completion-count">
+          Виконано: {{ completionPercent }}%
+        </span>
+      </div>
     </div>
 
     <div class="controls-grid">
@@ -113,9 +131,14 @@ const hasFilters = computed(() =>
       </div>
 
       <div class="control-group">
-        <label for="task-status">Статус</label>
+        <label for="task-status">
+          Статус
+        </label>
 
-        <select id="task-status" v-model="statusValue">
+        <select
+          id="task-status"
+          v-model="statusValue"
+        >
           <option value="all">Усі статуси</option>
           <option value="todo">Заплановано</option>
           <option value="progress">У роботі</option>
@@ -124,9 +147,14 @@ const hasFilters = computed(() =>
       </div>
 
       <div class="control-group">
-        <label for="task-priority">Пріоритет</label>
+        <label for="task-priority">
+          Пріоритет
+        </label>
 
-        <select id="task-priority" v-model="priorityValue">
+        <select
+          id="task-priority"
+          v-model="priorityValue"
+        >
           <option value="all">Усі пріоритети</option>
           <option value="high">Високий</option>
           <option value="medium">Середній</option>
@@ -135,27 +163,42 @@ const hasFilters = computed(() =>
       </div>
 
       <div class="control-group">
-        <label for="task-sort">Сортування</label>
+        <label for="task-sort">
+          Сортування
+        </label>
 
-        <select id="task-sort" v-model="sortValue">
+        <select
+          id="task-sort"
+          v-model="sortValue"
+        >
           <option value="default">
             За порядком додавання
           </option>
+
           <option value="title-asc">
             Назва: А → Я
           </option>
+
           <option value="title-desc">
             Назва: Я → А
           </option>
+
           <option value="priority-high">
             Пріоритет: високий → низький
           </option>
+
           <option value="priority-low">
             Пріоритет: низький → високий
           </option>
+
+          <option value="status">
+            Статус: У роботі → Заплановано → Виконано
+          </option>
+
           <option value="date-asc">
             Дата: найближчі спочатку
           </option>
+
           <option value="date-desc">
             Дата: найпізніші спочатку
           </option>
@@ -174,12 +217,16 @@ const hasFilters = computed(() =>
       </label>
 
       <p class="quick-filter-description">
-        Показувати лише заплановані завдання та завдання в роботі.
+        Показувати лише заплановані завдання
+        та завдання в роботі.
       </p>
     </div>
 
     <div class="controls-footer">
-      <p v-if="hasFilters" class="filter-note">
+      <p
+        v-if="hasFilters"
+        class="filter-note"
+      >
         Активні параметри пошуку або фільтрації
       </p>
 
@@ -219,9 +266,25 @@ const hasFilters = computed(() =>
   color: #26354d;
 }
 
+.results-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .results-count {
   font-size: 13px;
   color: #64748b;
+}
+
+.completion-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: #7952b3;
+  background: #f5f0fb;
+  padding: 6px 10px;
+  border-radius: 8px;
 }
 
 .controls-grid {
@@ -349,6 +412,10 @@ const hasFilters = computed(() =>
 
   .task-controls {
     padding: 16px;
+  }
+
+  .results-info {
+    gap: 8px;
   }
 }
 </style>

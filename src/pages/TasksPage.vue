@@ -1,5 +1,6 @@
 
 <script setup>
+import '../css/task-list.css'
 import { ref, computed } from 'vue'
 import {
   f7Popup,
@@ -39,8 +40,16 @@ const priorityValues = {
   low: 1
 }
 
+const statusValues = {
+  progress: 0,
+  todo: 1,
+  done: 2
+}
+
 const filteredTasks = computed(() => {
-  const query = searchQuery.value.trim().toLocaleLowerCase('uk-UA')
+  const query = searchQuery.value
+    .trim()
+    .toLocaleLowerCase('uk-UA')
 
   const result = state.tasks.filter(task => {
     const matchesStatus =
@@ -52,10 +61,14 @@ const filteredTasks = computed(() => {
       task.priority === priorityFilter.value
 
     const matchesIncomplete =
-      !onlyIncomplete.value || task.status !== 'done'
+      !onlyIncomplete.value ||
+      task.status !== 'done'
 
-    const title = String(task.title ?? '').toLocaleLowerCase('uk-UA')
-    const description = String(task.description ?? '').toLocaleLowerCase('uk-UA')
+    const title = String(task.title ?? '')
+      .toLocaleLowerCase('uk-UA')
+
+    const description = String(task.description ?? '')
+      .toLocaleLowerCase('uk-UA')
 
     const matchesSearch =
       title.includes(query) ||
@@ -70,14 +83,39 @@ const filteredTasks = computed(() => {
   })
 
   const compareTitle = (a, b) =>
-    String(a.title).localeCompare(String(b.title), 'uk-UA')
+    String(a.title ?? '').localeCompare(
+      String(b.title ?? ''),
+      'uk-UA'
+    )
 
   const comparePriority = (a, b) =>
     (priorityValues[a.priority] ?? 0) -
     (priorityValues[b.priority] ?? 0)
 
-  const compareDate = (a, b) =>
-    String(a.dueDate ?? '').localeCompare(String(b.dueDate ?? ''))
+  const compareStatus = (a, b) =>
+    (statusValues[a.status] ?? 3) -
+    (statusValues[b.status] ?? 3)
+
+  function compareDate(a, b, descending = false) {
+    const firstDate = String(a.dueDate ?? '').trim()
+    const secondDate = String(b.dueDate ?? '').trim()
+
+    if (!firstDate && !secondDate) {
+      return 0
+    }
+
+    if (!firstDate) {
+      return 1
+    }
+
+    if (!secondDate) {
+      return -1
+    }
+
+    return descending
+      ? secondDate.localeCompare(firstDate)
+      : firstDate.localeCompare(secondDate)
+  }
 
   switch (sortOrder.value) {
     case 'title-asc':
@@ -96,12 +134,17 @@ const filteredTasks = computed(() => {
       result.sort(comparePriority)
       break
 
+    case 'status':
+    case 'status-order':
+      result.sort(compareStatus)
+      break
+
     case 'date-asc':
-      result.sort(compareDate)
+      result.sort((a, b) => compareDate(a, b))
       break
 
     case 'date-desc':
-      result.sort((a, b) => compareDate(b, a))
+      result.sort((a, b) => compareDate(a, b, true))
       break
 
     default:
@@ -112,20 +155,28 @@ const filteredTasks = computed(() => {
 })
 
 const selectedTask = computed(() =>
-  state.tasks.find(task => task.id === selectedTaskId.value) ?? null
+  state.tasks.find(
+    task => task.id === selectedTaskId.value
+  ) ?? null
 )
 
 const editingTask = computed(() =>
-  state.tasks.find(task => task.id === editingTaskId.value) ?? null
+  state.tasks.find(
+    task => task.id === editingTaskId.value
+  ) ?? null
 )
 
 const completedCount = computed(() =>
-  state.tasks.filter(task => task.status === 'done').length
+  state.tasks.filter(
+    task => task.status === 'done'
+  ).length
 )
 
 const completionPercent = computed(() =>
   state.tasks.length
-    ? Math.round(completedCount.value / state.tasks.length * 100)
+    ? Math.round(
+        completedCount.value / state.tasks.length * 100
+      )
     : 0
 )
 
@@ -188,7 +239,9 @@ function handleSave(data) {
 }
 
 function handleDelete(id) {
-  const task = state.tasks.find(item => item.id === id)
+  const task = state.tasks.find(
+    item => item.id === id
+  )
 
   if (!task) {
     return
@@ -220,19 +273,33 @@ function handleDelete(id) {
 }
 
 function statusName(status) {
-  if (status === 'done') return 'Виконано'
-  if (status === 'progress') return 'У роботі'
+  if (status === 'done') {
+    return 'Виконано'
+  }
+
+  if (status === 'progress') {
+    return 'У роботі'
+  }
+
   return 'Заплановано'
 }
 
 function priorityName(priority) {
-  if (priority === 'high') return 'Високий'
-  if (priority === 'medium') return 'Середній'
+  if (priority === 'high') {
+    return 'Високий'
+  }
+
+  if (priority === 'medium') {
+    return 'Середній'
+  }
+
   return 'Низький'
 }
 
 function formatDate(value) {
-  if (!value) return 'Без терміну'
+  if (!value) {
+    return 'Без терміну'
+  }
 
   const date = new Date(value + 'T12:00:00')
 
@@ -250,12 +317,18 @@ function formatDate(value) {
 
 <template>
   <f7-page name="tasks">
-    <f7-navbar title="Усі завдання" back-link="Назад" />
+    <f7-navbar
+      title="Усі завдання"
+      back-link="Назад"
+    />
 
     <div class="tasks-container">
       <div class="page-heading">
         <h1>Мої завдання</h1>
-        <p>Переглядайте, створюйте та редагуйте завдання.</p>
+
+        <p>
+          Переглядайте, створюйте та редагуйте завдання.
+        </p>
 
         <button
           type="button"
@@ -274,12 +347,14 @@ function formatDate(value) {
         v-model:onlyIncomplete="onlyIncomplete"
         :total="state.tasks.length"
         :found="filteredTasks.length"
+        :completed="completedCount"
         @reset="resetFilters"
       />
 
       <div class="progress-section">
         <div class="progress-heading">
           <strong>Прогрес виконання</strong>
+
           <span>
             {{ completedCount }} із {{ state.tasks.length }}
             — {{ completionPercent }}%
@@ -301,7 +376,10 @@ function formatDate(value) {
         </div>
       </div>
 
-      <div v-if="filteredTasks.length" class="tasks-grid">
+      <div
+        v-if="filteredTasks.length"
+        class="tasks-grid"
+      >
         <div
           v-for="task in filteredTasks"
           :key="task.id"
@@ -309,28 +387,14 @@ function formatDate(value) {
         >
           <TaskCard
             :task="task"
+            :editable="true"
+            :deletable="true"
             @status-change="handleStatusChange"
             @priority-change="handlePriorityChange"
             @task-select="handleTaskSelect"
+            @edit="openEditForm"
+            @delete="handleDelete"
           />
-
-          <div class="task-actions">
-            <button
-              type="button"
-              class="edit-button"
-              @click="openEditForm(task.id)"
-            >
-              Редагувати
-            </button>
-
-            <button
-              type="button"
-              class="delete-button"
-              @click="handleDelete(task.id)"
-            >
-              Видалити
-            </button>
-          </div>
         </div>
       </div>
 
@@ -372,10 +436,16 @@ function formatDate(value) {
     >
       <f7Page>
         <f7Navbar
-          :title="editingTaskId !== null ? 'Редагування' : 'Нове завдання'"
+          :title="
+            editingTaskId !== null
+              ? 'Редагування'
+              : 'Нове завдання'
+          "
         >
           <f7NavRight>
-            <f7Link popup-close>Закрити</f7Link>
+            <f7Link popup-close>
+              Закрити
+            </f7Link>
           </f7NavRight>
         </f7Navbar>
 
@@ -399,12 +469,18 @@ function formatDate(value) {
       <f7Page>
         <f7Navbar title="Інформація про завдання">
           <f7NavRight>
-            <f7Link popup-close>Закрити</f7Link>
+            <f7Link popup-close>
+              Закрити
+            </f7Link>
           </f7NavRight>
         </f7Navbar>
 
-        <div v-if="selectedTask" class="details-container">
+        <div
+          v-if="selectedTask"
+          class="details-container"
+        >
           <h2>{{ selectedTask.title }}</h2>
+
           <p>{{ selectedTask.description }}</p>
 
           <div class="detail-row">
@@ -495,41 +571,6 @@ function formatDate(value) {
 
 .task-wrapper {
   min-width: 0;
-}
-
-.task-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.edit-button,
-.delete-button {
-  flex: 1;
-  padding: 11px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.edit-button {
-  border: none;
-  background: #e9e1f4;
-  color: #604096;
-}
-
-.delete-button {
-  border: 1px solid #fecaca;
-  background: #fff1f2;
-  color: #b91c1c;
-}
-
-.edit-button:hover {
-  background: #ded0ef;
-}
-
-.delete-button:hover {
-  background: #ffe4e6;
 }
 
 .empty-state {

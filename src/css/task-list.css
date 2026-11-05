@@ -1,0 +1,58 @@
+
+/* TaskFlow — загальні стилі списку завдань */
+
+:root {
+  --task-primary: #7952b3;
+  --task-primary-hover: #68439f;
+  --task-text: #26354d;
+  --task-muted: #64748b;
+  --task-border: #e0e5ef;
+  --task-background: #ffffff;
+}
+
+/* Коректний розрахунок ширини елементів */
+.tasks-container,
+.tasks-container *,
+.task-controls,
+.task-controls * {
+  box-sizing: border-box;
+}
+
+/* Плавна взаємодія з кнопками */
+.tasks-container button,
+.task-controls button {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+/* Виділення елементів під час роботи з клавіатурою */
+.tasks-container button:focus-visible,
+.task-controls button:focus-visible,
+.task-controls input:focus-visible,
+.task-controls select:focus-visible {
+  outline: 2px solid var(--task-primary);
+  outline-offset: 2px;
+}
+
+/* Запобігання виходу тексту за межі карток */
+.tasks-grid,
+.task-wrapper {
+  min-width: 0;
+}
+
+.task-wrapper {
+  overflow-wrap: anywhere;
+}
+
+/* Адаптивність для невеликих екранів */
+@media (max-width: 600px) {
+  .tasks-container {
+    width: 100%;
+  }
+
+  .tasks-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
