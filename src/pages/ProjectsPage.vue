@@ -38,32 +38,53 @@ const isEditing = computed(() =>
   editingProjectId.value !== null
 )
 
-function getProjectTasks(projectId) {
+// Статистика всіх проєктів із Pinia
+const projectStats = computed(() =>
+  projectsStore.projectStats
+)
+
+function getProjectStats(projectId) {
+  return projectStats.value.find(
+    project => project.id === Number(projectId)
+  ) ?? {
+    total: 0,
+    completed: 0,
+    pending: 0,
+    progress: 0
+  }
+}
+
+// Кількість завдань, які змінять статус
+function getProjectChangeCount(projectId) {
   return tasksStore.tasks.filter(
-    task => Number(task.projectId) === Number(projectId)
-  )
-}
-
-function getProjectTaskCount(projectId) {
-  return getProjectTasks(projectId).length
-}
-
-function getProjectCompletedCount(projectId) {
-  return getProjectTasks(projectId).filter(
-    task => task.status === 'done'
+    task =>
+      Number(task.projectId) === Number(projectId) &&
+      task.status !== 'progress'
   ).length
 }
 
-function getProjectProgress(projectId) {
-  const total = getProjectTaskCount(projectId)
+// Групове переведення завдань у роботу
+function startProjectTasks(project) {
+  const stats = getProjectStats(project.id)
+  const changeCount = getProjectChangeCount(project.id)
 
-  if (total === 0) {
-    return 0
+  if (stats.total === 0 || changeCount === 0) {
+    return
   }
 
-  return Math.round(
-    getProjectCompletedCount(projectId) / total * 100
+  const confirmed = window.confirm(
+    `Перевести всі завдання проєкту «${project.name}» ` +
+    'у статус «У роботі»?\n\n' +
+    `Буде змінено завдань: ${changeCount}.\n\n` +
+    'Увага! Виконані завдання також втратять ' +
+    'статус «Виконано».'
   )
+
+  if (!confirmed) {
+    return
+  }
+
+  tasksStore.startAllProjectTasks(project.id)
 }
 
 function openCreateForm() {
@@ -122,7 +143,10 @@ function saveProject() {
   }
 
   const result = isEditing.value
-    ? projectsStore.updateProject(editingProjectId.value, data)
+    ? projectsStore.updateProject(
+        editingProjectId.value,
+        data
+      )
     : projectsStore.addProject(data)
 
   if (!result) {
@@ -134,7 +158,7 @@ function saveProject() {
 }
 
 function deleteProject(project) {
-  const taskCount = getProjectTaskCount(project.id)
+  const taskCount = getProjectStats(project.id).total
 
   if (taskCount > 0) {
     window.alert(
@@ -205,11 +229,11 @@ function deleteProject(project) {
       </div>
 
       <div
-        v-if="projectsStore.projects.length"
+        v-if="projectStats.length"
         class="projects-grid"
       >
         <article
-          v-for="project in projectsStore.projects"
+          v-for="project in projectStats"
           :key="project.id"
           class="project-card"
         >
@@ -228,16 +252,12 @@ function deleteProject(project) {
           <div class="project-statistics">
             <span>
               Усього завдань:
-              <strong>
-                {{ getProjectTaskCount(project.id) }}
-              </strong>
+              <strong>{{ project.total }}</strong>
             </span>
 
             <span>
               Виконано:
-              <strong>
-                {{ getProjectCompletedCount(project.id) }}
-              </strong>
+              <strong>{{ project.completed }}</strong>
             </span>
           </div>
 
@@ -245,27 +265,39 @@ function deleteProject(project) {
             <span>Прогрес виконання</span>
 
             <strong>
-              {{ getProjectProgress(project.id) }}%
+              {{ project.progress }}%
             </strong>
           </div>
 
           <div
             class="progress-track"
             role="progressbar"
-            :aria-valuenow="getProjectProgress(project.id)"
+            :aria-valuenow="project.progress"
             aria-valuemin="0"
             aria-valuemax="100"
-            :aria-label="
-              `Прогрес проєкту ${project.name}`
-            "
+            :aria-label="`Прогрес проєкту ${project.name}`"
           >
             <div
               class="progress-fill"
-              :style="{
-                width: getProjectProgress(project.id) + '%'
-              }"
+              :style="{ width: project.progress + '%' }"
             ></div>
           </div>
+
+          <!-- Групова зміна статусу завдань -->
+          <button
+            type="button"
+            class="start-all-button"
+            :disabled="getProjectChangeCount(project.id) === 0"
+            @click="startProjectTasks(project)"
+          >
+            {{
+              project.total === 0
+                ? 'У проєкті немає завдань'
+                : getProjectChangeCount(project.id) === 0
+                  ? 'Усі завдання вже в роботі'
+                  : 'Усі завдання — у роботу'
+            }}
+          </button>
 
           <div class="project-actions">
             <button
@@ -339,7 +371,11 @@ function deleteProject(project) {
           @submit.prevent="saveProject"
         >
           <h2>
-            {{ isEditing ? 'Редагувати проєкт' : 'Створити проєкт' }}
+            {{
+              isEditing
+                ? 'Редагувати проєкт'
+                : 'Створити проєкт'
+            }}
           </h2>
 
           <div class="form-group">
@@ -390,8 +426,15 @@ function deleteProject(project) {
           </p>
 
           <div class="form-actions">
-            <button type="submit" class="main-button">
-              {{ isEditing ? 'Зберегти зміни' : 'Створити проєкт' }}
+            <button
+              type="submit"
+              class="main-button"
+            >
+              {{
+                isEditing
+                  ? 'Зберегти зміни'
+                  : 'Створити проєкт'
+              }}
             </button>
 
             <button
@@ -477,6 +520,7 @@ function deleteProject(project) {
 }
 
 .project-card {
+  min-width: 0;
   padding: 20px;
   background: white;
   border: 1px solid #e2e8f0;
@@ -494,9 +538,11 @@ function deleteProject(project) {
   margin: 0;
   font-size: 18px;
   color: #26354d;
+  overflow-wrap: anywhere;
 }
 
 .project-id {
+  flex-shrink: 0;
   padding: 5px 9px;
   border-radius: 8px;
   background: #f5f3fa;
@@ -548,14 +594,41 @@ function deleteProject(project) {
   transition: width 0.2s ease;
 }
 
+/* Кнопка групової зміни статусу */
+.start-all-button {
+  width: 100%;
+  margin-top: 20px;
+  padding: 11px 14px;
+  border: 1px solid #7952b3;
+  border-radius: 8px;
+  background: #7952b3;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.start-all-button:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.start-all-button:disabled {
+  background: #f1f3f8;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
 .project-actions {
   display: flex;
   gap: 10px;
-  margin-top: 20px;
+  margin-top: 10px;
 }
 
 .project-actions button {
   flex: 1;
+  min-width: 0;
   padding: 11px;
   border-radius: 8px;
   font-size: 13px;
@@ -671,6 +744,14 @@ function deleteProject(project) {
   background: #f1f3f8;
   color: #26354d;
   cursor: pointer;
+}
+
+.start-all-button:focus-visible,
+.project-actions button:focus-visible,
+.main-button:focus-visible,
+.secondary-button:focus-visible {
+  outline: 3px solid #7952b3;
+  outline-offset: 3px;
 }
 
 @media (max-width: 740px) {

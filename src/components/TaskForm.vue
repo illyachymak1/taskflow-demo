@@ -75,12 +75,12 @@ function isValidDate(value) {
   return `${year}-${month}-${day}` === value
 }
 
+// Дата завершення тепер необов'язкова
 function validateDate() {
   delete errors.dueDate
 
   if (!form.dueDate) {
-    errors.dueDate = 'Вкажіть дату завершення.'
-    return false
+    return true
   }
 
   if (!isValidDate(form.dueDate)) {
@@ -183,7 +183,7 @@ function saveTask() {
     description: form.description.trim(),
     status: form.status,
     priority: form.priority,
-    dueDate: form.dueDate,
+    dueDate: form.dueDate || null,
     category: form.category,
     projectId: Number(form.projectId)
   })
@@ -304,7 +304,9 @@ const categoryLabels = {
       </div>
 
       <div class="form-group">
-        <label for="task-date">Дата завершення *</label>
+        <label for="task-date">
+          Дата завершення (необов'язково)
+        </label>
 
         <input
           id="task-date"

@@ -32,6 +32,12 @@ const formOpened = ref(false)
 const editingTaskId = ref(null)
 const formKey = ref(0)
 
+// Фільтр зберігається безпосередньо в Pinia
+const onlyWithoutDueDate = computed({
+  get: () => tasksStore.filters.onlyWithoutDueDate,
+  set: value => tasksStore.setOnlyWithoutDueDate(value)
+})
+
 const priorityValues = {
   high: 3,
   medium: 2,
@@ -44,12 +50,13 @@ const statusValues = {
   done: 2
 }
 
+// Використовуємо getter visibleTasks із Pinia
 const filteredTasks = computed(() => {
   const query = searchQuery.value
     .trim()
     .toLocaleLowerCase('uk-UA')
 
-  const result = tasksStore.tasks.filter(task => {
+  const result = tasksStore.visibleTasks.filter(task => {
     const matchesStatus =
       statusFilter.value === 'all' ||
       task.status === statusFilter.value
@@ -103,17 +110,9 @@ const filteredTasks = computed(() => {
     const firstDate = String(a.dueDate ?? '').trim()
     const secondDate = String(b.dueDate ?? '').trim()
 
-    if (!firstDate && !secondDate) {
-      return 0
-    }
-
-    if (!firstDate) {
-      return 1
-    }
-
-    if (!secondDate) {
-      return -1
-    }
+    if (!firstDate && !secondDate) return 0
+    if (!firstDate) return 1
+    if (!secondDate) return -1
 
     return descending
       ? secondDate.localeCompare(firstDate)
@@ -223,6 +222,9 @@ function resetFilters() {
   sortOrder.value = 'default'
   searchQuery.value = ''
   onlyIncomplete.value = false
+
+  // Скидаємо також фільтр у Pinia
+  tasksStore.setOnlyWithoutDueDate(false)
 }
 
 function handleSave(data) {
@@ -246,17 +248,14 @@ function handleSave(data) {
 function handleDelete(id) {
   const task = tasksStore.getTaskById(id)
 
-  if (!task) {
-    return
-  }
+  if (!task) return
 
   const confirmed = window.confirm(
-    `Видалити завдання «${task.title}»?\n\nЦю дію не можна скасувати.`
+    `Видалити завдання «${task.title}»?\n\n` +
+    'Цю дію не можна скасувати.'
   )
 
-  if (!confirmed) {
-    return
-  }
+  if (!confirmed) return
 
   const removed = tasksStore.deleteTask(id)
 
@@ -276,33 +275,19 @@ function handleDelete(id) {
 }
 
 function statusName(status) {
-  if (status === 'done') {
-    return 'Виконано'
-  }
-
-  if (status === 'progress') {
-    return 'У роботі'
-  }
-
+  if (status === 'done') return 'Виконано'
+  if (status === 'progress') return 'У роботі'
   return 'Заплановано'
 }
 
 function priorityName(priority) {
-  if (priority === 'high') {
-    return 'Високий'
-  }
-
-  if (priority === 'medium') {
-    return 'Середній'
-  }
-
+  if (priority === 'high') return 'Високий'
+  if (priority === 'medium') return 'Середній'
   return 'Низький'
 }
 
 function formatDate(value) {
-  if (!value) {
-    return 'Без терміну'
-  }
+  if (!value) return 'Без терміну'
 
   const date = new Date(value + 'T12:00:00')
 
@@ -345,7 +330,10 @@ function formatDate(value) {
       <section class="projects-section">
         <div class="section-heading">
           <h2>Мої проєкти</h2>
-          <span>{{ projectsStore.totalProjects }} проєкти</span>
+
+          <span>
+            {{ projectsStore.totalProjects }} проєкти
+          </span>
         </div>
 
         <div class="projects-grid">
@@ -354,7 +342,10 @@ function formatDate(value) {
             :key="project.id"
             type="button"
             class="project-card"
-            :class="{ active: String(projectFilter) === String(project.id) }"
+            :class="{
+              active:
+                String(projectFilter) === String(project.id)
+            }"
             @click="
               projectFilter =
                 String(projectFilter) === String(project.id)
@@ -363,7 +354,9 @@ function formatDate(value) {
             "
           >
             <strong>{{ project.name }}</strong>
+
             <span>{{ project.description }}</span>
+
             <small>
               Завдань: {{ getProjectTaskCount(project.id) }}
             </small>
@@ -371,8 +364,8 @@ function formatDate(value) {
         </div>
 
         <p class="projects-hint">
-          Натисніть на проєкт, щоб показати лише його завдання.
-          Повторне натискання скасовує фільтр.
+          Натисніть на проєкт, щоб показати лише його
+          завдання. Повторне натискання скасовує фільтр.
         </p>
       </section>
 
@@ -387,6 +380,26 @@ function formatDate(value) {
         :completed="completedCount"
         @reset="resetFilters"
       />
+
+      <!-- Новий фільтр із Pinia -->
+      <section class="due-date-filter-section">
+        <label class="due-date-filter-label">
+          <input
+            v-model="onlyWithoutDueDate"
+            type="checkbox"
+            class="due-date-checkbox"
+          />
+
+          <span class="due-date-filter-text">
+            <strong>Лише без терміну</strong>
+
+            <small>
+              Показувати тільки завдання, для яких
+              не встановлено дату завершення.
+            </small>
+          </span>
+        </label>
+      </section>
 
       <div class="progress-section">
         <div class="progress-heading">
@@ -650,6 +663,54 @@ function formatDate(value) {
   color: #64748b;
 }
 
+/* Новий блок фільтра */
+.due-date-filter-section {
+  margin: 14px 0 22px;
+  padding: 16px;
+  background: #f8f6fc;
+  border: 1px solid #e2d9f0;
+  border-radius: 12px;
+}
+
+.due-date-filter-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.due-date-checkbox {
+  width: 17px;
+  height: 17px;
+  margin: 2px 0 0;
+  flex-shrink: 0;
+  accent-color: #7952b3;
+  cursor: pointer;
+}
+
+.due-date-filter-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.due-date-filter-text strong {
+  font-size: 14px;
+  color: #26354d;
+}
+
+.due-date-filter-text small {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.due-date-checkbox:focus-visible {
+  outline: 3px solid #7952b3;
+  outline-offset: 3px;
+}
+
+/* Прогрес виконання */
 .progress-section {
   background: white;
   border: 1px solid #e2e8f0;
@@ -682,6 +743,7 @@ function formatDate(value) {
   transition: width 0.2s ease;
 }
 
+/* Картки завдань */
 .tasks-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -732,6 +794,10 @@ function formatDate(value) {
 
   .tasks-container {
     padding: 16px 12px 100px;
+  }
+
+  .due-date-filter-section {
+    padding: 14px;
   }
 }
 </style>

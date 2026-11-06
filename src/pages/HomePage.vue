@@ -26,6 +26,9 @@ const inProgress = computed(() => tasksStore.progressTasks)
 const planned = computed(() => tasksStore.plannedTasks)
 const progressPercent = computed(() => tasksStore.completionPercent)
 
+// Статистика проєктів із централізованого getter Pinia
+const projectStats = computed(() => projectsStore.projectStats)
+
 const activeTasks = computed(() => {
   const priorities = {
     high: 3,
@@ -139,6 +142,71 @@ function formatDate(value) {
         </div>
 
         <p>Виконано {{ progressPercent }}% завдань</p>
+      </div>
+
+      <!-- Статистика проєктів -->
+      <div class="section-heading">
+        <h2>Статистика проєктів</h2>
+        <f7-link href="/projects/">Усі проєкти →</f7-link>
+      </div>
+
+      <div v-if="projectStats.length" class="projects-grid">
+        <article
+          v-for="project in projectStats"
+          :key="project.id"
+          class="project-card"
+        >
+          <div class="project-header">
+            <h3>{{ project.name }}</h3>
+            <span class="project-number">#{{ project.id }}</span>
+          </div>
+
+          <p class="project-description">
+            {{ project.description || 'Опис відсутній.' }}
+          </p>
+
+          <div class="project-counters">
+            <div class="project-counter">
+              <span>Усього завдань</span>
+              <strong>{{ project.total }}</strong>
+            </div>
+
+            <div class="project-counter">
+              <span>Невиконано</span>
+              <strong class="pending-count">
+                {{ project.pending }}
+              </strong>
+            </div>
+
+            <div class="project-counter">
+              <span>Виконано</span>
+              <strong>{{ project.completed }}</strong>
+            </div>
+          </div>
+
+          <div class="project-progress-heading">
+            <span>Прогрес виконання</span>
+            <strong>{{ project.progress }}%</strong>
+          </div>
+
+          <div
+            class="progress-bar project-progress-bar"
+            role="progressbar"
+            :aria-valuenow="project.progress"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-label="`Прогрес проєкту ${project.name}`"
+          >
+            <div
+              class="progress-fill"
+              :style="{ width: project.progress + '%' }"
+            ></div>
+          </div>
+        </article>
+      </div>
+
+      <div v-else class="empty-message">
+        Проєктів поки немає.
       </div>
 
       <div class="section-heading">
@@ -267,8 +335,105 @@ h2 {
   margin-top: 25px;
 }
 
+.section-heading h2 {
+  margin-bottom: 15px;
+}
+
 .section-heading a {
   font-size: 14px;
+}
+
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.project-card {
+  min-width: 0;
+  padding: 18px;
+  background: #ffffff;
+  border: 1px solid #e0e4ed;
+  border-radius: 14px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+}
+
+.project-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #26354d;
+  overflow-wrap: anywhere;
+}
+
+.project-number {
+  flex-shrink: 0;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: #f5f3fa;
+  color: #7952b3;
+  font-size: 12px;
+}
+
+.project-description {
+  min-height: 38px;
+  margin: 12px 0 16px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.project-counters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.project-counter {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 10px;
+  border-radius: 9px;
+  background: #f8f7fc;
+}
+
+.project-counter span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.project-counter strong {
+  color: #26354d;
+  font-size: 22px;
+}
+
+.project-counter .pending-count {
+  color: #7952b3;
+}
+
+.project-progress-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+  font-size: 13px;
+  color: #596579;
+}
+
+.project-progress-heading strong {
+  color: #26354d;
+}
+
+.project-progress-bar {
+  height: 10px;
 }
 
 .tasks-grid {
@@ -310,7 +475,8 @@ h2 {
 }
 
 @media (max-width: 740px) {
-  .statistics-grid {
+  .statistics-grid,
+  .projects-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -320,6 +486,28 @@ h2 {
 
   .home-container {
     padding: 16px 12px 100px;
+  }
+}
+
+@media (max-width: 520px) {
+  .projects-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-counters {
+    gap: 6px;
+  }
+
+  .project-counter {
+    padding: 10px 7px;
+  }
+
+  .project-counter span {
+    font-size: 11px;
+  }
+
+  .project-counter strong {
+    font-size: 19px;
   }
 }
 </style>

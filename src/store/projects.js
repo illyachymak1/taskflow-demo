@@ -1,5 +1,6 @@
 
 import { defineStore } from 'pinia'
+import { useTasksStore } from './tasks.js'
 
 export const useProjectsStore = defineStore('projects', {
   state: () => ({
@@ -23,7 +24,37 @@ export const useProjectsStore = defineStore('projects', {
   }),
 
   getters: {
-    totalProjects: state => state.projects.length
+    totalProjects: state => state.projects.length,
+
+    projectStats(state) {
+      const tasksStore = useTasksStore()
+
+      return state.projects.map(project => {
+        const projectTasks = tasksStore.tasks.filter(
+          task => Number(task.projectId) === project.id
+        )
+
+        const total = projectTasks.length
+
+        const completed = projectTasks.filter(
+          task => task.status === 'done'
+        ).length
+
+        const pending = total - completed
+
+        const progress = total === 0
+          ? 0
+          : Math.round((completed / total) * 100)
+
+        return {
+          ...project,
+          total,
+          completed,
+          pending,
+          progress
+        }
+      })
+    }
   },
 
   actions: {

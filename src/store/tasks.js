@@ -94,7 +94,13 @@ function normalizeTaskData(data) {
     return null
   }
 
-  if (!validDate(data.dueDate)) {
+  // Дозволяємо створювати завдання без терміну
+  if (
+    data.dueDate !== null &&
+    data.dueDate !== undefined &&
+    data.dueDate !== '' &&
+    !validDate(data.dueDate)
+  ) {
     return null
   }
 
@@ -116,7 +122,7 @@ function normalizeTaskData(data) {
     description,
     status: data.status,
     priority: data.priority,
-    dueDate: data.dueDate,
+    dueDate: data.dueDate || null,
     category,
     projectId
   }
@@ -137,7 +143,12 @@ function prepareInitialTasks() {
 
 export const useTasksStore = defineStore('tasks', {
   state: () => ({
-    tasks: prepareInitialTasks()
+    tasks: prepareInitialTasks(),
+
+    // Централізований стан фільтра
+    filters: {
+      onlyWithoutDueDate: false
+    }
   }),
 
   getters: {
@@ -169,6 +180,17 @@ export const useTasksStore = defineStore('tasks', {
             this.completedTasks / this.totalTasks * 100
           )
         : 0
+    },
+
+    // Getter для фільтрації завдань без терміну
+    visibleTasks: state => {
+      if (!state.filters.onlyWithoutDueDate) {
+        return state.tasks
+      }
+
+      return state.tasks.filter(
+        task => !task.dueDate
+      )
     }
   },
 
@@ -256,6 +278,34 @@ export const useTasksStore = defineStore('tasks', {
 
     setTaskPriority({ id, priority }) {
       return this.changePriority(id, priority)
+    },
+
+    // Групове переведення завдань проєкту в роботу
+    startAllProjectTasks(projectId) {
+      const id = Number(projectId)
+
+      if (!Number.isInteger(id) || id < 1) {
+        return 0
+      }
+
+      let changedCount = 0
+
+      this.tasks.forEach(task => {
+        if (
+          Number(task.projectId) === id &&
+          task.status !== 'progress'
+        ) {
+          task.status = 'progress'
+          changedCount++
+        }
+      })
+
+      return changedCount
+    },
+
+    // Керування фільтром без терміну
+    setOnlyWithoutDueDate(value) {
+      this.filters.onlyWithoutDueDate = Boolean(value)
     },
 
     deleteTask(id) {
