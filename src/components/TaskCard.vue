@@ -3,6 +3,9 @@
 import { computed } from 'vue'
 import StatusBadge from './StatusBadge.vue'
 import PriorityBadge from './PriorityBadge.vue'
+import { useProjectsStore } from '../store/projects.js'
+
+const projectsStore = useProjectsStore()
 
 const props = defineProps({
   task: {
@@ -29,6 +32,14 @@ const emit = defineEmits([
 
 const statusSequence = ['todo', 'progress', 'done']
 const prioritySequence = ['low', 'medium', 'high']
+
+const projectName = computed(() => {
+  const project = projectsStore.getProjectById(
+    props.task.projectId
+  )
+
+  return project?.name ?? 'Проєкт не визначено'
+})
 
 const statusActionText = computed(() => {
   if (props.task.status === 'todo') {
@@ -114,6 +125,14 @@ function deleteTask() {
     <p class="description">
       {{ task.description }}
     </p>
+
+    <div class="project-row">
+      <span class="project-label">Проєкт:</span>
+
+      <span class="project-badge">
+        {{ projectName }}
+      </span>
+    </div>
 
     <div class="card-info">
       <div class="priority-row">
@@ -208,6 +227,33 @@ function deleteTask() {
   color: #596579;
   line-height: 1.5;
   margin: 16px 0;
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.project-label {
+  color: #596579;
+  font-size: 13px;
+}
+
+.project-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #e2d9f0;
+  border-radius: 8px;
+  background: #f5f3fa;
+  color: #7952b3;
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .card-info {

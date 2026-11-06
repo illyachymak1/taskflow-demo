@@ -14,17 +14,15 @@ import TaskCard from '../components/TaskCard.vue'
 import TaskForm from '../components/TaskForm.vue'
 import TaskListControls from '../components/TaskListControls.vue'
 
-import {
-  state,
-  addTask,
-  updateTask,
-  deleteTask,
-  changeStatus,
-  changePriority
-} from '../store/tasks.js'
+import { useTasksStore } from '../store/tasks.js'
+import { useProjectsStore } from '../store/projects.js'
+
+const tasksStore = useTasksStore()
+const projectsStore = useProjectsStore()
 
 const statusFilter = ref('all')
 const priorityFilter = ref('all')
+const projectFilter = ref('all')
 const sortOrder = ref('default')
 const searchQuery = ref('')
 const onlyIncomplete = ref(false)
@@ -51,7 +49,7 @@ const filteredTasks = computed(() => {
     .trim()
     .toLocaleLowerCase('uk-UA')
 
-  const result = state.tasks.filter(task => {
+  const result = tasksStore.tasks.filter(task => {
     const matchesStatus =
       statusFilter.value === 'all' ||
       task.status === statusFilter.value
@@ -59,6 +57,10 @@ const filteredTasks = computed(() => {
     const matchesPriority =
       priorityFilter.value === 'all' ||
       task.priority === priorityFilter.value
+
+    const matchesProject =
+      projectFilter.value === 'all' ||
+      Number(task.projectId) === Number(projectFilter.value)
 
     const matchesIncomplete =
       !onlyIncomplete.value ||
@@ -77,6 +79,7 @@ const filteredTasks = computed(() => {
     return (
       matchesStatus &&
       matchesPriority &&
+      matchesProject &&
       matchesSearch &&
       matchesIncomplete
     )
@@ -155,37 +158,38 @@ const filteredTasks = computed(() => {
 })
 
 const selectedTask = computed(() =>
-  state.tasks.find(
-    task => task.id === selectedTaskId.value
-  ) ?? null
+  tasksStore.getTaskById(selectedTaskId.value)
 )
 
 const editingTask = computed(() =>
-  state.tasks.find(
-    task => task.id === editingTaskId.value
-  ) ?? null
+  tasksStore.getTaskById(editingTaskId.value)
 )
 
 const completedCount = computed(() =>
-  state.tasks.filter(
-    task => task.status === 'done'
-  ).length
+  tasksStore.completedTasks
 )
 
 const completionPercent = computed(() =>
-  state.tasks.length
-    ? Math.round(
-        completedCount.value / state.tasks.length * 100
-      )
-    : 0
+  tasksStore.completionPercent
 )
 
+function getProjectName(projectId) {
+  return projectsStore.getProjectById(projectId)?.name ??
+    'Проєкт не визначено'
+}
+
+function getProjectTaskCount(projectId) {
+  return tasksStore.tasks.filter(
+    task => Number(task.projectId) === Number(projectId)
+  ).length
+}
+
 function handleStatusChange(data) {
-  changeStatus(data.id, data.status)
+  tasksStore.changeStatus(data.id, data.status)
 }
 
 function handlePriorityChange(data) {
-  changePriority(data.id, data.priority)
+  tasksStore.changePriority(data.id, data.priority)
 }
 
 function handleTaskSelect(id) {
@@ -215,6 +219,7 @@ function closeForm() {
 function resetFilters() {
   statusFilter.value = 'all'
   priorityFilter.value = 'all'
+  projectFilter.value = 'all'
   sortOrder.value = 'default'
   searchQuery.value = ''
   onlyIncomplete.value = false
@@ -224,8 +229,8 @@ function handleSave(data) {
   const isEditing = editingTaskId.value !== null
 
   const result = isEditing
-    ? updateTask(data)
-    : addTask(data)
+    ? tasksStore.updateTask(data)
+    : tasksStore.addTask(data)
 
   if (result) {
     if (!isEditing) {
@@ -239,9 +244,7 @@ function handleSave(data) {
 }
 
 function handleDelete(id) {
-  const task = state.tasks.find(
-    item => item.id === id
-  )
+  const task = tasksStore.getTaskById(id)
 
   if (!task) {
     return
@@ -255,7 +258,7 @@ function handleDelete(id) {
     return
   }
 
-  const removed = deleteTask(id)
+  const removed = tasksStore.deleteTask(id)
 
   if (!removed) {
     window.alert('Не вдалося видалити завдання.')
@@ -339,13 +342,47 @@ function formatDate(value) {
         </button>
       </div>
 
+      <section class="projects-section">
+        <div class="section-heading">
+          <h2>Мої проєкти</h2>
+          <span>{{ projectsStore.totalProjects }} проєкти</span>
+        </div>
+
+        <div class="projects-grid">
+          <button
+            v-for="project in projectsStore.projects"
+            :key="project.id"
+            type="button"
+            class="project-card"
+            :class="{ active: String(projectFilter) === String(project.id) }"
+            @click="
+              projectFilter =
+                String(projectFilter) === String(project.id)
+                  ? 'all'
+                  : String(project.id)
+            "
+          >
+            <strong>{{ project.name }}</strong>
+            <span>{{ project.description }}</span>
+            <small>
+              Завдань: {{ getProjectTaskCount(project.id) }}
+            </small>
+          </button>
+        </div>
+
+        <p class="projects-hint">
+          Натисніть на проєкт, щоб показати лише його завдання.
+          Повторне натискання скасовує фільтр.
+        </p>
+      </section>
+
       <TaskListControls
         v-model:search="searchQuery"
         v-model:status="statusFilter"
         v-model:priority="priorityFilter"
         v-model:sort="sortOrder"
         v-model:onlyIncomplete="onlyIncomplete"
-        :total="state.tasks.length"
+        :total="tasksStore.totalTasks"
         :found="filteredTasks.length"
         :completed="completedCount"
         @reset="resetFilters"
@@ -356,7 +393,7 @@ function formatDate(value) {
           <strong>Прогрес виконання</strong>
 
           <span>
-            {{ completedCount }} із {{ state.tasks.length }}
+            {{ completedCount }} із {{ tasksStore.totalTasks }}
             — {{ completionPercent }}%
           </span>
         </div>
@@ -401,7 +438,7 @@ function formatDate(value) {
       <div v-else class="empty-state">
         <h3>Завдань не знайдено</h3>
 
-        <p v-if="state.tasks.length">
+        <p v-if="tasksStore.totalTasks">
           Спробуйте змінити параметри пошуку.
         </p>
 
@@ -410,7 +447,7 @@ function formatDate(value) {
         </p>
 
         <button
-          v-if="state.tasks.length"
+          v-if="tasksStore.totalTasks"
           type="button"
           class="main-button"
           @click="resetFilters"
@@ -429,7 +466,6 @@ function formatDate(value) {
       </div>
     </div>
 
-    <!-- Форма створення та редагування -->
     <f7Popup
       :opened="formOpened"
       @popup:closed="closeForm"
@@ -453,7 +489,7 @@ function formatDate(value) {
           <TaskForm
             :key="formKey"
             :task="editingTask"
-            :existing-tasks="state.tasks"
+            :existing-tasks="tasksStore.tasks"
             @save="handleSave"
             @cancel="closeForm"
           />
@@ -461,7 +497,6 @@ function formatDate(value) {
       </f7Page>
     </f7Popup>
 
-    <!-- Перегляд інформації про завдання -->
     <f7Popup
       :opened="selectedTaskId !== null"
       @popup:closed="closeTaskDetails"
@@ -491,6 +526,11 @@ function formatDate(value) {
           <div class="detail-row">
             <strong>Пріоритет:</strong>
             {{ priorityName(selectedTask.priority) }}
+          </div>
+
+          <div class="detail-row">
+            <strong>Проєкт:</strong>
+            {{ getProjectName(selectedTask.projectId) }}
           </div>
 
           <div class="detail-row">
@@ -529,6 +569,85 @@ function formatDate(value) {
   border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
+}
+
+.projects-section {
+  margin: 24px 0;
+  padding: 20px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #26354d;
+}
+
+.section-heading span {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.project-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  text-align: left;
+  padding: 15px;
+  border: 1px solid #e2d9f0;
+  border-radius: 10px;
+  background: #f8f6fc;
+  color: #26354d;
+  cursor: pointer;
+}
+
+.project-card strong {
+  font-size: 14px;
+}
+
+.project-card span {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.project-card small {
+  margin-top: auto;
+  color: #7952b3;
+  font-weight: 600;
+}
+
+.project-card.active {
+  border-color: #7952b3;
+  background: #eee7f8;
+  box-shadow: 0 0 0 1px #7952b3;
+}
+
+.project-card:hover {
+  border-color: #7952b3;
+}
+
+.projects-hint {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: #64748b;
 }
 
 .progress-section {
@@ -606,7 +725,8 @@ function formatDate(value) {
 }
 
 @media (max-width: 740px) {
-  .tasks-grid {
+  .tasks-grid,
+  .projects-grid {
     grid-template-columns: 1fr;
   }
 

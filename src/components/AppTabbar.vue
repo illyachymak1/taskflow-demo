@@ -14,7 +14,10 @@
       <span class="nav-icon" aria-hidden="true">
         {{ item.icon }}
       </span>
-      <span>{{ item.title }}</span>
+
+      <span class="nav-title">
+        {{ item.title }}
+      </span>
     </a>
   </nav>
 </template>
@@ -28,6 +31,7 @@ const currentPath = ref('/')
 const menu = [
   { path: '/', title: 'Головна', icon: '⌂' },
   { path: '/tasks/', title: 'Завдання', icon: '☷' },
+  { path: '/projects/', title: 'Проєкти', icon: '▦' },
   { path: '/about/', title: 'Про застосунок', icon: 'ⓘ' },
 ]
 
@@ -81,6 +85,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 5px;
+  min-width: 0;
+  padding: 0 4px;
   color: #666;
   text-decoration: none;
   font-size: 12px;
@@ -89,6 +95,12 @@ onUnmounted(() => {
 
 .nav-icon {
   font-size: 25px;
+  line-height: 1;
+}
+
+.nav-title {
+  text-align: center;
+  line-height: 1.2;
 }
 
 .nav-item.active {
@@ -104,12 +116,12 @@ onUnmounted(() => {
 
 @media (max-width: 400px) {
   .nav-item {
-    font-size: 11px;
+    font-size: 10px;
     gap: 4px;
   }
 
   .nav-icon {
-    font-size: 23px;
+    font-size: 22px;
   }
 }
 </style>

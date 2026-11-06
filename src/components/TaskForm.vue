@@ -1,6 +1,9 @@
 
 <script setup>
 import { reactive, computed, watch, ref } from 'vue'
+import { useProjectsStore } from '../store/projects.js'
+
+const projectsStore = useProjectsStore()
 
 const props = defineProps({
   task: {
@@ -21,7 +24,8 @@ const form = reactive({
   status: 'todo',
   priority: 'medium',
   dueDate: '',
-  category: 'study'
+  category: 'study',
+  projectId: 1
 })
 
 const errors = reactive({})
@@ -31,6 +35,16 @@ const isEditing = computed(() => Boolean(props.task))
 
 const titleRemaining = computed(() => 80 - form.title.length)
 const descriptionRemaining = computed(() => 300 - form.description.length)
+
+const projectOptions = computed(() => projectsStore.projects)
+
+const selectedProject = computed(() =>
+  projectsStore.getProjectById(form.projectId)
+)
+
+function getDefaultProjectId() {
+  return projectsStore.projects[0]?.id ?? null
+}
 
 function getToday() {
   const date = new Date()
@@ -94,13 +108,15 @@ function fillForm(task) {
   form.priority = task?.priority ?? 'medium'
   form.dueDate = task?.dueDate ?? ''
   form.category = task?.category ?? 'study'
+  form.projectId = Number(
+    task?.projectId ?? getDefaultProjectId()
+  )
 
   clearErrors()
 }
 
 watch(() => props.task, fillForm, { immediate: true })
 
-// Перевіряємо дату відразу після її зміни
 watch(() => form.dueDate, () => {
   if (form.dueDate || submitted.value) {
     validateDate()
@@ -145,6 +161,10 @@ function validate() {
     errors.category = 'Виберіть категорію.'
   }
 
+  if (!selectedProject.value) {
+    errors.projectId = 'Виберіть проєкт.'
+  }
+
   validateDate()
 
   return Object.keys(errors).length === 0
@@ -164,7 +184,8 @@ function saveTask() {
     status: form.status,
     priority: form.priority,
     dueDate: form.dueDate,
-    category: form.category
+    category: form.category,
+    projectId: Number(form.projectId)
   })
 }
 
@@ -319,6 +340,28 @@ const categoryLabels = {
           {{ errors.category }}
         </span>
       </div>
+
+      <div class="form-group">
+        <label for="task-project">Проєкт *</label>
+
+        <select
+          id="task-project"
+          v-model.number="form.projectId"
+          :aria-invalid="Boolean(errors.projectId)"
+        >
+          <option
+            v-for="project in projectOptions"
+            :key="project.id"
+            :value="project.id"
+          >
+            {{ project.name }}
+          </option>
+        </select>
+
+        <span v-if="errors.projectId" class="error">
+          {{ errors.projectId }}
+        </span>
+      </div>
     </div>
 
     <div class="preview">
@@ -345,6 +388,10 @@ const categoryLabels = {
       </p>
 
       <p>
+        Проєкт: {{ selectedProject?.name || 'Не вибрано' }}
+      </p>
+
+      <p>
         Термін: {{ form.dueDate || 'Не вказано' }}
       </p>
 
@@ -354,24 +401,15 @@ const categoryLabels = {
     </div>
 
     <div class="form-actions">
-      <button
-        type="submit"
-        class="primary"
-      >
+      <button type="submit" class="primary">
         {{ isEditing ? 'Зберегти зміни' : 'Створити завдання' }}
       </button>
 
-      <button
-        type="button"
-        @click="resetForm"
-      >
+      <button type="button" @click="resetForm">
         Очистити форму
       </button>
 
-      <button
-        type="button"
-        @click="cancelForm"
-      >
+      <button type="button" @click="cancelForm">
         Скасувати
       </button>
     </div>

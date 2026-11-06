@@ -1,5 +1,6 @@
 
 import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 
 import Framework7 from 'framework7/lite-bundle'
 import Framework7Vue, {
@@ -26,8 +27,14 @@ Framework7.use(Framework7Vue)
 
 const app = createApp(App)
 
+// Підключення Pinia
+const pinia = createPinia()
+app.use(pinia)
+
+// Підключення Framework7
 app.use(Framework7Vue)
 
+// Реєстрація компонентів Framework7
 const components = {
   f7App,
   f7View,

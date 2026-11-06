@@ -1,37 +1,30 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { f7Popup, f7Page, f7Navbar, f7NavRight, f7Link } from 'framework7-vue'
+import {
+  f7Popup,
+  f7Page,
+  f7Navbar,
+  f7NavRight,
+  f7Link
+} from 'framework7-vue'
+
 import TaskCard from '../components/TaskCard.vue'
 import TaskCounter from '../components/TaskCounter.vue'
 
-import {
-  state,
-  changeStatus,
-  changePriority
-} from '../store/tasks.js'
+import { useTasksStore } from '../store/tasks.js'
+import { useProjectsStore } from '../store/projects.js'
+
+const tasksStore = useTasksStore()
+const projectsStore = useProjectsStore()
 
 const selectedTaskId = ref(null)
 
-const total = computed(() => state.tasks.length)
-
-const completed = computed(() => {
-  return state.tasks.filter(task => task.status === 'done').length
-})
-
-const inProgress = computed(() => {
-  return state.tasks.filter(task => task.status === 'progress').length
-})
-
-const planned = computed(() => {
-  return state.tasks.filter(task => task.status === 'todo').length
-})
-
-const progressPercent = computed(() => {
-  if (total.value === 0) return 0
-
-  return Math.round(completed.value / total.value * 100)
-})
+const total = computed(() => tasksStore.totalTasks)
+const completed = computed(() => tasksStore.completedTasks)
+const inProgress = computed(() => tasksStore.progressTasks)
+const planned = computed(() => tasksStore.plannedTasks)
+const progressPercent = computed(() => tasksStore.completionPercent)
 
 const activeTasks = computed(() => {
   const priorities = {
@@ -40,22 +33,31 @@ const activeTasks = computed(() => {
     low: 1
   }
 
-  return state.tasks
+  return tasksStore.tasks
     .filter(task => task.status !== 'done')
-    .sort((a, b) => priorities[b.priority] - priorities[a.priority])
+    .sort(
+      (a, b) =>
+        (priorities[b.priority] ?? 0) -
+        (priorities[a.priority] ?? 0)
+    )
     .slice(0, 3)
 })
 
-const selectedTask = computed(() => {
-  return state.tasks.find(task => task.id === selectedTaskId.value)
-})
+const selectedTask = computed(() =>
+  tasksStore.getTaskById(selectedTaskId.value)
+)
+
+function getProjectName(projectId) {
+  return projectsStore.getProjectById(projectId)?.name ??
+    'Проєкт не визначено'
+}
 
 function handleStatusChange(data) {
-  changeStatus(data.id, data.status)
+  tasksStore.changeStatus(data.id, data.status)
 }
 
 function handlePriorityChange(data) {
-  changePriority(data.id, data.priority)
+  tasksStore.changePriority(data.id, data.priority)
 }
 
 function handleTaskSelect(id) {
@@ -76,6 +78,24 @@ function priorityName(priority) {
   if (priority === 'high') return 'Високий'
   if (priority === 'medium') return 'Середній'
   return 'Низький'
+}
+
+function formatDate(value) {
+  if (!value) {
+    return 'Без терміну'
+  }
+
+  const date = new Date(`${value}T12:00:00`)
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Дата не визначена'
+  }
+
+  return new Intl.DateTimeFormat('uk-UA', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  }).format(date)
 }
 </script>
 
@@ -169,8 +189,13 @@ function priorityName(priority) {
           </div>
 
           <div class="detail-row">
+            <strong>Проєкт:</strong>
+            {{ getProjectName(selectedTask.projectId) }}
+          </div>
+
+          <div class="detail-row">
             <strong>Термін:</strong>
-            {{ selectedTask.dueDate || 'Без терміну' }}
+            {{ formatDate(selectedTask.dueDate) }}
           </div>
         </div>
       </f7-page>

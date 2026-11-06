@@ -1,12 +1,11 @@
 
-import { reactive, computed } from 'vue'
+import { defineStore } from 'pinia'
 import defaultTasks from '../data/tasks.js'
 
 const allowedStatuses = ['todo', 'progress', 'done']
 const allowedPriorities = ['low', 'medium', 'high']
 const allowedCategories = ['study', 'work', 'personal']
 
-// Додаткові завдання з попередньої роботи
 const extraTasks = [
   {
     id: 7,
@@ -42,34 +41,6 @@ const extraTasks = [
   }
 ]
 
-// Спільне реактивне сховище
-export const state = reactive({
-  tasks: [
-    ...defaultTasks.map(task => ({ ...task })),
-    ...extraTasks.map(task => ({ ...task }))
-  ]
-})
-
-// Назва зі методички
-export const taskState = state
-
-// Реактивна статистика
-export const totalTasks = computed(() => state.tasks.length)
-
-export const completedTasks = computed(() =>
-  state.tasks.filter(task => task.status === 'done').length
-)
-
-export const pendingTasks = computed(() =>
-  state.tasks.filter(task => task.status !== 'done').length
-)
-
-// Пошук завдання
-function findTask(id) {
-  return state.tasks.find(task => task.id === Number(id))
-}
-
-// Перевірка дати
 function validDate(value) {
   if (
     typeof value !== 'string' ||
@@ -92,7 +63,6 @@ function validDate(value) {
   return formatted === value
 }
 
-// Перевірка введених даних
 function normalizeTaskData(data) {
   if (!data || typeof data !== 'object') {
     return null
@@ -132,109 +102,174 @@ function normalizeTaskData(data) {
     ? data.category
     : 'study'
 
+  const projectId = Number(data.projectId)
+
+  if (
+    !Number.isInteger(projectId) ||
+    projectId < 1
+  ) {
+    return null
+  }
+
   return {
     title,
     description,
     status: data.status,
     priority: data.priority,
     dueDate: data.dueDate,
-    category
+    category,
+    projectId
   }
 }
 
-// Створення завдання
-export function addTask(data) {
-  const normalized = normalizeTaskData(data)
-
-  if (!normalized) {
-    return null
-  }
-
-  const nextId = state.tasks.reduce((maxId, task) =>
-    Math.max(maxId, Number(task.id) || 0), 0
-  ) + 1
-
-  const newTask = {
-    id: nextId,
-    ...normalized
-  }
-
-  state.tasks.unshift(newTask)
-
-  return newTask
+function prepareInitialTasks() {
+  return [
+    ...defaultTasks,
+    ...extraTasks
+  ].map(task => ({
+    ...task,
+    category: allowedCategories.includes(task.category)
+      ? task.category
+      : 'study',
+    projectId: Number(task.projectId) || 1
+  }))
 }
 
-// Редагування завдання
-export function updateTask({ id, ...data }) {
-  const normalized = normalizeTaskData(data)
+export const useTasksStore = defineStore('tasks', {
+  state: () => ({
+    tasks: prepareInitialTasks()
+  }),
 
-  if (!normalized) {
-    return null
+  getters: {
+    totalTasks: state => state.tasks.length,
+
+    completedTasks: state =>
+      state.tasks.filter(
+        task => task.status === 'done'
+      ).length,
+
+    pendingTasks: state =>
+      state.tasks.filter(
+        task => task.status !== 'done'
+      ).length,
+
+    progressTasks: state =>
+      state.tasks.filter(
+        task => task.status === 'progress'
+      ).length,
+
+    plannedTasks: state =>
+      state.tasks.filter(
+        task => task.status === 'todo'
+      ).length,
+
+    completionPercent() {
+      return this.totalTasks
+        ? Math.round(
+            this.completedTasks / this.totalTasks * 100
+          )
+        : 0
+    }
+  },
+
+  actions: {
+    getTaskById(id) {
+      return this.tasks.find(
+        task => task.id === Number(id)
+      ) ?? null
+    },
+
+    addTask(data) {
+      const normalized = normalizeTaskData(data)
+
+      if (!normalized) {
+        return null
+      }
+
+      const nextId = this.tasks.reduce(
+        (maxId, task) =>
+          Math.max(maxId, Number(task.id) || 0),
+        0
+      ) + 1
+
+      const newTask = {
+        id: nextId,
+        ...normalized
+      }
+
+      this.tasks.unshift(newTask)
+
+      return newTask
+    },
+
+    updateTask({ id, ...data }) {
+      const normalized = normalizeTaskData(data)
+
+      if (!normalized) {
+        return null
+      }
+
+      const task = this.getTaskById(id)
+
+      if (!task) {
+        return null
+      }
+
+      Object.assign(task, normalized)
+
+      return task
+    },
+
+    changeStatus(id, status) {
+      if (!allowedStatuses.includes(status)) {
+        return false
+      }
+
+      const task = this.getTaskById(id)
+
+      if (!task) {
+        return false
+      }
+
+      task.status = status
+      return true
+    },
+
+    changePriority(id, priority) {
+      if (!allowedPriorities.includes(priority)) {
+        return false
+      }
+
+      const task = this.getTaskById(id)
+
+      if (!task) {
+        return false
+      }
+
+      task.priority = priority
+      return true
+    },
+
+    setTaskStatus({ id, status }) {
+      return this.changeStatus(id, status)
+    },
+
+    setTaskPriority({ id, priority }) {
+      return this.changePriority(id, priority)
+    },
+
+    deleteTask(id) {
+      const index = this.tasks.findIndex(
+        task => task.id === Number(id)
+      )
+
+      if (index === -1) {
+        return false
+      }
+
+      this.tasks.splice(index, 1)
+
+      return true
+    }
   }
-
-  const task = findTask(id)
-
-  if (!task) {
-    return null
-  }
-
-  Object.assign(task, normalized)
-
-  return task
-}
-
-// Зміна статусу
-export function changeStatus(id, status) {
-  if (!allowedStatuses.includes(status)) {
-    return false
-  }
-
-  const task = findTask(id)
-
-  if (!task) {
-    return false
-  }
-
-  task.status = status
-  return true
-}
-
-// Зміна пріоритету
-export function changePriority(id, priority) {
-  if (!allowedPriorities.includes(priority)) {
-    return false
-  }
-
-  const task = findTask(id)
-
-  if (!task) {
-    return false
-  }
-
-  task.priority = priority
-  return true
-}
-
-// Сумісність із назвами функцій у методичці
-export function setTaskStatus({ id, status }) {
-  return changeStatus(id, status)
-}
-
-export function setTaskPriority({ id, priority }) {
-  return changePriority(id, priority)
-}
-
-// Видалення завдання
-export function deleteTask(id) {
-  const index = state.tasks.findIndex(
-    task => task.id === Number(id)
-  )
-
-  if (index === -1) {
-    return false
-  }
-
-  state.tasks.splice(index, 1)
-
-  return true
-}
+})
