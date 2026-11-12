@@ -22,6 +22,7 @@ import 'framework7/css/bundle'
 import './style.css'
 
 import App from './App.vue'
+import { initializePersistence } from './services/persistence.js'
 
 Framework7.use(Framework7Vue)
 
@@ -54,4 +55,19 @@ Object.entries(components).forEach(([name, component]) => {
   app.component(name, component)
 })
 
-app.mount('#app')
+// Відновлення даних перед запуском застосунку
+async function startApp() {
+  try {
+    await initializePersistence(pinia)
+    console.log('IndexedDB: дані успішно відновлено')
+  } catch (error) {
+    console.error(
+      'Не вдалося відновити дані з IndexedDB:',
+      error
+    )
+  }
+
+  app.mount('#app')
+}
+
+startApp()

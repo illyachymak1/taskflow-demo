@@ -16,9 +16,41 @@ import TaskListControls from '../components/TaskListControls.vue'
 
 import { useTasksStore } from '../store/tasks.js'
 import { useProjectsStore } from '../store/projects.js'
+import { persistenceStatus } from '../services/persistence.js'
 
 const tasksStore = useTasksStore()
 const projectsStore = useProjectsStore()
+
+// Індикатор збереження IndexedDB
+const saveMessage = computed(() => {
+  if (persistenceStatus.error) {
+    return `Помилка збереження: ${persistenceStatus.error}`
+  }
+
+  if (!persistenceStatus.ready) {
+    return 'Завантаження даних...'
+  }
+
+  if (persistenceStatus.saving) {
+    return 'Збереження змін...'
+  }
+
+  if (persistenceStatus.saved) {
+    return 'Усі зміни збережено'
+  }
+
+  return 'Очікування збереження...'
+})
+
+const saveState = computed(() => {
+  if (persistenceStatus.error) return 'error'
+  if (!persistenceStatus.ready) return 'loading'
+  if (persistenceStatus.saving || !persistenceStatus.saved) {
+    return 'saving'
+  }
+
+  return 'saved'
+})
 
 const statusFilter = ref('all')
 const priorityFilter = ref('all')
@@ -50,7 +82,7 @@ const statusValues = {
   done: 2
 }
 
-// Використовуємо getter visibleTasks із Pinia
+// Фільтрація та сортування завдань
 const filteredTasks = computed(() => {
   const query = searchQuery.value
     .trim()
@@ -223,7 +255,6 @@ function resetFilters() {
   searchQuery.value = ''
   onlyIncomplete.value = false
 
-  // Скидаємо також фільтр у Pinia
   tasksStore.setOnlyWithoutDueDate(false)
 }
 
@@ -327,6 +358,23 @@ function formatDate(value) {
         </button>
       </div>
 
+      <!-- Індикатор IndexedDB -->
+      <section
+        class="tf7-persistence"
+        :class="`tf7-persistence--${saveState}`"
+        role="status"
+        aria-live="polite"
+      >
+        <span
+          class="tf7-persistence-dot"
+          aria-hidden="true"
+        ></span>
+
+        <span class="tf7-persistence-message">
+          {{ saveMessage }}
+        </span>
+      </section>
+
       <section class="projects-section">
         <div class="section-heading">
           <h2>Мої проєкти</h2>
@@ -381,7 +429,7 @@ function formatDate(value) {
         @reset="resetFilters"
       />
 
-      <!-- Новий фільтр із Pinia -->
+      <!-- Фільтр завдань без терміну -->
       <section class="due-date-filter-section">
         <label class="due-date-filter-label">
           <input
@@ -479,6 +527,7 @@ function formatDate(value) {
       </div>
     </div>
 
+    <!-- Форма створення та редагування -->
     <f7Popup
       :opened="formOpened"
       @popup:closed="closeForm"
@@ -510,6 +559,7 @@ function formatDate(value) {
       </f7Page>
     </f7Popup>
 
+    <!-- Детальна інформація про завдання -->
     <f7Popup
       :opened="selectedTaskId !== null"
       @popup:closed="closeTaskDetails"
@@ -584,6 +634,82 @@ function formatDate(value) {
   font-size: 14px;
 }
 
+/* Індикатор IndexedDB */
+.tf7-persistence {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid #e2d9f0;
+  border-radius: 12px;
+  background: #f8f6fc;
+  color: #26354d;
+  font-size: 14px;
+}
+
+.tf7-persistence-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #94a3b8;
+}
+
+.tf7-persistence-message {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.tf7-persistence--saved {
+  border-color: #b7dfca;
+  background: #effaf3;
+  color: #17613c;
+}
+
+.tf7-persistence--saved .tf7-persistence-dot {
+  background: #22a06b;
+}
+
+.tf7-persistence--saving {
+  border-color: #f1d6a4;
+  background: #fff9eb;
+  color: #80591c;
+}
+
+.tf7-persistence--saving .tf7-persistence-dot {
+  background: #e3a126;
+  animation: savePulse 1s infinite alternate;
+}
+
+.tf7-persistence--loading .tf7-persistence-dot {
+  background: #7952b3;
+  animation: savePulse 1s infinite alternate;
+}
+
+.tf7-persistence--error {
+  border-color: #f0b7bd;
+  background: #fff1f2;
+  color: #a52232;
+}
+
+.tf7-persistence--error .tf7-persistence-dot {
+  background: #dc3545;
+}
+
+@keyframes savePulse {
+  from {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* Проєкти */
 .projects-section {
   margin: 24px 0;
   padding: 20px;
@@ -663,7 +789,7 @@ function formatDate(value) {
   color: #64748b;
 }
 
-/* Новий блок фільтра */
+/* Фільтр без терміну */
 .due-date-filter-section {
   margin: 14px 0 22px;
   padding: 16px;
